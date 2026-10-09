@@ -7,8 +7,10 @@ SRC="$(dirname "$(readlink -f "$0")")/../../extensions/$UUID"
 DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
 
 step "Copying extension to $DEST"
+rm -rf "$DEST"
 mkdir -p "$DEST"
-cp "$SRC"/* "$DEST"/
+cp -r "$SRC"/. "$DEST"/
+glib-compile-schemas "$DEST/schemas"
 
 step "Enabling extension"
 gnome_ext_set_enabled "$UUID" true

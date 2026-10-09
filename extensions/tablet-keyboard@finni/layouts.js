@@ -3,6 +3,9 @@
 
 import Gio from 'gi://Gio';
 
+// Width of the empty middle of a split keyboard, relative to the keys
+const SPLIT_GAP = 0.56;
+
 const FALLBACK_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 
 // Swipe-down characters, by position, like the iPad's flick keys.
@@ -159,7 +162,48 @@ function symbolPage(rows, alts, otherPage, otherLabel, multiSource) {
     };
 }
 
-export function buildPages(group, multiSource) {
+// Splits a page into two halves with an untouchable gap in the middle: each
+// row breaks after half of its characters, the space bar in two.
+function splitPage(page) {
+    const gap = Math.round(page.units * SPLIT_GAP * 10) / 10;
+    const rows = page.rows.map(row => {
+        const space = row.findIndex(k => k.kind === 'space');
+        if (space >= 0) {
+            const half = {...row[space], width: row[space].width / 2};
+            return [
+                ...row.slice(0, space),
+                half, {kind: 'split', width: gap}, {...half},
+                ...row.slice(space + 1),
+            ];
+        }
+
+        const chars = row.filter(k => k.kind === 'char');
+        const breakAfter = chars[Math.ceil(chars.length / 2) - 1];
+        const at = row.indexOf(breakAfter) + 1;
+        return [...row.slice(0, at), {kind: 'split', width: gap}, ...row.slice(at)];
+    });
+    return {units: page.units + gap, rows};
+}
+
+function withoutAlts(page) {
+    return {
+        units: page.units,
+        rows: page.rows.map(row => row.map(k => (k.alt ? {...k, alt: null} : k))),
+    };
+}
+
+export function buildPages(group, multiSource, {split = false, alts = true} = {}) {
+    const pages = basePages(group, multiSource);
+    for (const name of Object.keys(pages)) {
+        if (!alts)
+            pages[name] = withoutAlts(pages[name]);
+        if (split)
+            pages[name] = splitPage(pages[name]);
+    }
+    return pages;
+}
+
+function basePages(group, multiSource) {
     return {
         letters: lettersPage(group, multiSource),
         numbers: symbolPage(

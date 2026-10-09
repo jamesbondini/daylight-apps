@@ -15,11 +15,15 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as KeyboardUI from 'resource:///org/gnome/shell/ui/keyboard.js';
 import * as InputSourceManager from 'resource:///org/gnome/shell/ui/status/keyboard.js';
 
+import {findCorrection} from './autocorrect.js';
 import {buildPages} from './layouts.js';
 
 const LONG_PRESS_MS = 450;
 const TRACKPAD_PRESS_MS = 400;
 const DELETE_REPEAT_MS = 450;
+const DELETE_CHAR_MS = 90;
+const DELETE_WORD_MS = 280;
+const DELETE_WORDS_AFTER = 12;
 const SHIFT_DOUBLE_TAP_MS = 350;
 const DOUBLE_SPACE_MS = 1200;
 const TYPING_QUIET_MS = 400;
@@ -32,6 +36,14 @@ const {InputContentPurpose: Purpose, InputContentHintFlags: Hint} = Clutter;
 const purposes = (...names) => new Set(names.map(n => Purpose[n]).filter(p => p !== undefined));
 const TEXT_PURPOSES = purposes('NORMAL', 'ALPHA', 'NAME');
 const NUMERIC_PURPOSES = purposes('DIGITS', 'NUMBER', 'PHONE', 'PIN');
+const CORRECTION_TRIGGERS = /^[.,!?;:]$/;
+
+// The extension object, for settings and the preferences window
+let extension = null;
+
+export function setExtension(ext) {
+    extension = ext;
+}
 
 function upper(text) {
     const up = text.toLocaleUpperCase();
@@ -189,6 +201,7 @@ class TabletKeyGrid extends St.Widget {
             y_expand: true,
         });
         this._rows = [];
+        this._voids = [];
         this._units = 1;
         this._metricsSize = 0;
         this._metricsId = 0;
@@ -204,13 +217,16 @@ class TabletKeyGrid extends St.Widget {
     setPage(page) {
         this.destroy_all_children();
         this.keys = [];
+        this._voids = [];
         this._units = page.units;
         this._rows = page.rows.map((row, rowIndex) => {
             let start = 0;
             const keys = [];
             for (const spec of row) {
                 const width = spec.width ?? 1;
-                if (spec.kind !== 'gap') {
+                if (spec.kind === 'split')
+                    this._voids.push({rowIndex, start, units: width});
+                else if (spec.kind !== 'gap') {
                     const key = new KeyActor(spec);
                     key.rowIndex = rowIndex;
                     key.start = start;
@@ -312,9 +328,14 @@ class TabletKeyGrid extends St.Widget {
         if (this._rows.length === 0)
             return null;
 
-        const originY = this._origin?.[1] ?? 0;
+        const [originX, originY] = this._origin ?? [0, 0];
         const rowIndex = Math.clamp(
             Math.floor((y - originY) / this.rowHeight), 0, this._rows.length - 1);
+
+        // The middle of a split keyboard types nothing
+        const unit = (x - originX) / this.unitWidth;
+        if (this._voids.some(v => v.rowIndex === rowIndex && unit > v.start && unit < v.start + v.units))
+            return null;
 
         let best = null, bestDistance = Infinity;
         for (const key of this._rows[rowIndex]) {
@@ -373,7 +394,7 @@ class TabletKeyPreview extends St.Bin {
 
 const AccentPopup = GObject.registerClass(
 class TabletAccentPopup extends St.BoxLayout {
-    _init(key, items, dark) {
+    _init(key, items, dark, {widthScale = 1, fontScale = 0.42} = {}) {
         super._init({style_class: 'tk-accents'});
         if (dark)
             this.add_style_class_name('tk-dark');
@@ -382,7 +403,7 @@ class TabletAccentPopup extends St.BoxLayout {
         const [kw, kh] = key.get_transformed_size();
         const monitor = Main.layoutManager.keyboardMonitor;
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-        const cellWidth = Math.round(kw);
+        const cellWidth = Math.round(kw * widthScale);
         const width = cellWidth * items.length;
 
         // Grow to the right of the key, or to the left near the right edge
@@ -397,7 +418,7 @@ class TabletAccentPopup extends St.BoxLayout {
                     text,
                     x_align: Clutter.ActorAlign.CENTER,
                     y_align: Clutter.ActorAlign.CENTER,
-                    style: `font-size: ${Math.round(kh * 0.42 / scale)}px;`,
+                    style: `font-size: ${Math.round(kh * fontScale / scale)}px;`,
                 }),
             });
             cell.set_size(cellWidth, Math.round(kh));
@@ -448,6 +469,15 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this._interfaceSettings.connectObject('changed::color-scheme',
             () => this._syncColorScheme(), this);
+        this._settings.connectObject(
+            'changed::color-scheme', () => this._syncColorScheme(),
+            'changed::portrait-height', () => this._relayout(),
+            'changed::landscape-height', () => this._relayout(),
+            'changed::split-keyboard', () => this._relayout(),
+            'changed::swipe-symbols', () => this._rebuildPages(),
+            'changed::shortcut-bar', () => this._syncToolbar(),
+            'changed::auto-capitalize', () => this._updateAutoShift(),
+            this);
         this._syncColorScheme();
     }
 
@@ -456,6 +486,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (this._tkLayout)
             return;
 
+        this._settings = extension.getSettings();
         this._touches = new Map();
         this._mods = new Set();
         this._modsLocked = false;
@@ -466,9 +497,12 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._history = '';
         this._lastTypeTime = 0;
         this._lastSpaceTime = 0;
-        this._lastSurrounding = null;
         this._queue = Promise.resolve();
         this._pageName = 'letters';
+        this._splitActive = false;
+        this._selection = null;
+        this._lastCorrection = null;
+        this._keepWord = null;
 
         this._tkLayout = new St.BoxLayout({
             style_class: 'tk-layout',
@@ -479,6 +513,8 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
         this._toolbar = this._buildToolbar();
         this._tkLayout.add_child(this._toolbar);
+        this._shortcutBar = this._buildShortcutBar();
+        this._tkLayout.add_child(this._shortcutBar);
 
         this._grid = new KeyGrid();
         this._grid.connect('touch-event', this._onTouchEvent.bind(this));
@@ -512,7 +548,10 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     }
 
     _syncColorScheme() {
-        this._dark = this._interfaceSettings.get_string('color-scheme') === 'prefer-dark';
+        const scheme = this._settings.get_string('color-scheme');
+        this._dark = scheme === 'system'
+            ? this._interfaceSettings.get_string('color-scheme') === 'prefer-dark'
+            : scheme === 'dark';
         if (this._dark) {
             this.add_style_class_name('tk-dark');
             this._bottomPanelBox?.add_style_class_name('dark-mode-enabled');
@@ -531,12 +570,40 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     _updateKeys() {
         this._ensureUi();
 
-        const group = this._keyboardController.getCurrentGroup();
-        const sources = InputSourceManager.getInputSourceManager().inputSources;
-        this._pages = buildPages(group, Object.keys(sources).length > 1);
+        this._splitActive = this._wantSplit();
+        this._buildPages();
         this._pageName = null;
         this._syncToolbar();
         this._setActiveLevel('default');
+    }
+
+    _buildPages() {
+        const group = this._keyboardController.getCurrentGroup();
+        const sources = InputSourceManager.getInputSourceManager().inputSources;
+        this._pages = buildPages(group, Object.keys(sources).length > 1, {
+            split: this._splitActive,
+            alts: this._settings.get_boolean('swipe-symbols'),
+        });
+    }
+
+    // Rebuilds the keys after a settings change, staying on the same page
+    _rebuildPages() {
+        if (!this._pages)
+            return;
+
+        const name = this._pageName ?? 'letters';
+        this._buildPages();
+        this._pageName = null;
+        this._setPage(name);
+    }
+
+    _isLandscape() {
+        const monitor = Main.layoutManager.keyboardMonitor;
+        return !!monitor && monitor.width > monitor.height;
+    }
+
+    _wantSplit() {
+        return this._isLandscape() && this._settings.get_boolean('split-keyboard');
     }
 
     _onPurposeChanged(controller, purpose) {
@@ -582,13 +649,22 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (!monitor || !this._tkLayout)
             return;
 
-        const {width, height} = monitor;
-        const gridHeight = height >= width
-            ? width * 0.36 : Math.min(height * 0.42, width * 0.3);
-        const toolbarHeight = this._toolbar.visible ? Math.round(gridHeight * 0.16) : 0;
+        const split = this._wantSplit();
+        if (split !== this._splitActive) {
+            this._splitActive = split;
+            this._rebuildPages();
+        }
 
-        this._toolbar.height = toolbarHeight;
-        this._aspectContainer.setRatio(width, gridHeight + toolbarHeight);
+        const {width, height} = monitor;
+        const gridHeight = this._isLandscape()
+            ? Math.min(height * 0.42, width * 0.3) * this._settings.get_int('landscape-height') / 100
+            : width * 0.36 * this._settings.get_int('portrait-height') / 100;
+        const barVisible = this._toolbar.visible || this._shortcutBar.visible;
+        const barHeight = barVisible ? Math.round(gridHeight * 0.16) : 0;
+
+        this._toolbar.height = barHeight;
+        this._shortcutBar.height = barHeight;
+        this._aspectContainer.setRatio(width, gridHeight + barHeight);
     }
 
     vfunc_get_preferred_height(forWidth) {
@@ -694,7 +770,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         const hints = this._contentHint ?? 0;
         if (hints & Hint.UPPERCASE)
             return true;
-        if (!this._textAssist())
+        if (!this._textAssist() || !this._settings.get_boolean('auto-capitalize'))
             return false;
 
         const text = this._history;
@@ -720,13 +796,12 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     _resetContext() {
         this._history = '';
         this._lastSpaceTime = 0;
-        this._lastSurrounding = null;
         this._updateAutoShift();
         Main.inputMethod.request_surrounding();
     }
 
     _onSurroundingText() {
-        const [text, cursor] = Main.inputMethod.getSurroundingText();
+        const [text, cursor, anchor] = Main.inputMethod.getSurroundingText();
         if (text === null || text === undefined || cursor === null)
             return;
 
@@ -744,24 +819,46 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             return;
         }
 
-        const before = [...text].slice(0, cursor).join('');
-        if (before === this._lastSurrounding)
+        // Selected text, as a range for delete_surrounding()
+        if (anchor !== null && anchor !== undefined && anchor !== cursor)
+            this._setSelection(anchor < cursor ? [anchor - cursor, cursor - anchor] : [0, anchor - cursor]);
+        else
+            this._setSelection(null);
+
+        const history = [...text].slice(0, cursor).join('').slice(-64);
+        if (history === this._history)
             return;
 
-        this._lastSurrounding = before;
-        this._history = before.slice(-64);
+        this._history = history;
         this._updateAutoShift();
     }
 
     _noteTyped(text) {
         this._lastTypeTime = GLib.get_monotonic_time() / 1000;
         this._history = (this._history + text).slice(-64);
+        this._setSelection(null);
     }
 
-    _noteDeleted() {
+    _noteDeleted(count = 1) {
         this._lastTypeTime = GLib.get_monotonic_time() / 1000;
-        this._history = [...this._history].slice(0, -1).join('');
+        if (count > 0)
+            this._history = [...this._history].slice(0, -count).join('');
         this._lastSpaceTime = 0;
+        this._setSelection(null);
+    }
+
+    // After undo, paste and the like we no longer know the text
+    _forgetContext() {
+        this._history = '';
+        this._lastSpaceTime = 0;
+        this._lastCorrection = null;
+        Main.inputMethod.request_surrounding();
+    }
+
+    _setSelection(range) {
+        this._selection = range;
+        for (const button of this._selectionButtons ?? [])
+            button.visible = !!range;
     }
 
     _isTerminal() {
@@ -816,20 +913,73 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         });
     }
 
-    _deleteBackOne() {
+    _sendCombo(mods, keyval) {
+        const controller = this._keyboardController;
+        this._enqueue(() => {
+            for (const mod of mods)
+                controller.keyvalPress(mod);
+            controller.keyvalPress(keyval);
+            controller.keyvalRelease(keyval);
+            for (const mod of [...mods].reverse())
+                controller.keyvalRelease(mod);
+        });
+    }
+
+    // Deletes `count` characters before the cursor, or the selection
+    _deleteBack(count = 1) {
         const controller = this._keyboardController;
         if (this._usesInputMethod(false)) {
-            this._enqueue(() => Main.inputMethod.delete_surrounding(-1, 1));
+            const [offset, length] = this._selection ?? [-count, count];
+            this._enqueue(() => Main.inputMethod.delete_surrounding(offset, length));
         } else {
             this._enqueue(() => {
-                controller.keyvalPress(Clutter.KEY_BackSpace);
-                controller.keyvalRelease(Clutter.KEY_BackSpace);
+                for (let i = 0; i < count; i++) {
+                    controller.keyvalPress(Clutter.KEY_BackSpace);
+                    controller.keyvalRelease(Clutter.KEY_BackSpace);
+                }
             });
         }
     }
 
+    // Replaces the word just typed if it is a known mistake. Returns the fix.
+    _autocorrect() {
+        const keep = this._keepWord;
+        this._keepWord = null;
+        if (!this._settings.get_boolean('autocorrect') || !this._textAssist() || this._mods.size > 0)
+            return null;
+
+        const fix = findCorrection(this._history);
+        if (!fix || fix.original === keep)
+            return null;
+
+        const length = [...fix.original].length;
+        this._deleteBack(length);
+        this._noteDeleted(length);
+        this._commit(fix.replacement);
+        return fix;
+    }
+
+    // Backspace right after a correction brings back what was typed
+    _revertCorrection() {
+        const fix = this._lastCorrection;
+        this._lastCorrection = null;
+        if (!fix || !this._history.endsWith(fix.replacement + fix.trigger))
+            return false;
+
+        const length = [...fix.replacement].length + [...fix.trigger].length;
+        this._deleteBack(length);
+        this._noteDeleted(length);
+        this._commit(fix.original);
+        this._keepWord = fix.original;
+        return true;
+    }
+
     _typeChar(text) {
+        this._lastCorrection = null;
+        const fix = CORRECTION_TRIGGERS.test(text) ? this._autocorrect() : null;
         this._commit(text);
+        if (fix)
+            this._lastCorrection = {...fix, trigger: text};
 
         for (const touch of this._touches.values()) {
             if (touch.key?.spec.kind === 'shift')
@@ -845,17 +995,23 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         const now = GLib.get_monotonic_time() / 1000;
         const text = this._history;
 
+        this._lastCorrection = null;
+
         // Double-tap space: replace the first space with ". "
         if (this._textAssist() && this._mods.size === 0 &&
+            this._settings.get_boolean('double-space-period') &&
             now - this._lastSpaceTime < DOUBLE_SPACE_MS &&
             text.endsWith(' ') && /[\p{L}\p{N}]$/u.test(text.slice(0, -1))) {
-            this._deleteBackOne();
+            this._deleteBack();
             this._noteDeleted();
             this._commit('. ');
             this._lastSpaceTime = 0;
         } else {
+            const fix = this._autocorrect();
             this._commit(' ');
             this._lastSpaceTime = now;
+            if (fix)
+                this._lastCorrection = {...fix, trigger: ' '};
         }
 
         if (this._shiftMode === 'once' && this._shiftHeld === 0)
@@ -864,9 +1020,13 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     }
 
     _typeReturn() {
+        this._lastCorrection = null;
+        const fix = this._autocorrect();
         this._sendKeyval(Clutter.KEY_Return);
         this._noteTyped('\n');
         this._lastSpaceTime = 0;
+        if (fix)
+            this._lastCorrection = {...fix, trigger: '\n'};
         this._updateAutoShift();
     }
 
@@ -875,42 +1035,69 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     }
 
     _deleteDown(touch) {
-        const controller = this._keyboardController;
-        const alien = this._alienFocus();
-        touch.alien = alien;
+        if (this._revertCorrection()) {
+            touch.reverted = true;
+            return;
+        }
 
+        touch.alien = this._alienFocus();
+        this._deleteChar(touch.alien);
+        touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, DELETE_REPEAT_MS, () => {
+            touch.repeating = true;
+            touch.deleted = 0;
+            this._repeatDelete(touch);
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    // Holding backspace deletes letters, then speeds up to whole words
+    _repeatDelete(touch) {
+        const words = touch.deleted >= DELETE_WORDS_AFTER && !touch.alien && !this._isTerminal();
+        if (words) {
+            this._deleteWord();
+        } else {
+            this._deleteChar(touch.alien);
+            touch.deleted++;
+        }
+
+        touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
+            words ? DELETE_WORD_MS : DELETE_CHAR_MS, () => {
+                this._repeatDelete(touch);
+                return GLib.SOURCE_REMOVE;
+            });
+    }
+
+    _deleteChar(alien) {
         if (alien) {
-            // X11 clients: delete via the IM, repeating after a hold
+            // X11 clients: delete via the IM
+            const controller = this._keyboardController;
             this._enqueue(() => {
                 controller.toggleDelete(true, true);
                 controller.toggleDelete(false, true);
             });
-            touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, DELETE_REPEAT_MS, () => {
-                touch.timer = 0;
-                touch.repeating = true;
-                controller.toggleDelete(true, true);
-                return GLib.SOURCE_REMOVE;
-            });
         } else {
-            // Holds BackSpace down; the client handles key repeat
-            this._enqueue(() => controller.toggleDelete(true, false));
-            touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, DELETE_REPEAT_MS, () => {
-                touch.timer = 0;
-                touch.repeating = true;
-                return GLib.SOURCE_REMOVE;
-            });
+            this._deleteBack();
         }
         this._noteDeleted();
     }
 
+    // The previous word and the spaces after it, like Ctrl+Backspace
+    _deleteWord() {
+        const word = this._history.match(/\S*\s*$/u)[0];
+        if (this._usesInputMethod(false) && word.length > 0 && !this._selection) {
+            const length = [...word].length;
+            this._deleteBack(length);
+            this._noteDeleted(length);
+        } else {
+            this._sendCombo([Clutter.KEY_Control_L], Clutter.KEY_BackSpace);
+            this._noteDeleted([...word].length);
+        }
+    }
+
     _deleteUp(touch) {
-        const controller = this._keyboardController;
-        this._enqueue(() => controller.toggleDelete(false, touch.alien));
         if (touch.repeating) {
-            // Unknown how much was deleted; wait for the app's surrounding text
-            this._history = '';
-            this._lastSurrounding = null;
-            Main.inputMethod.request_surrounding();
+            // Unknown how much the app deleted; wait for its surrounding text
+            this._forgetContext();
         }
         this._updateAutoShift();
     }
@@ -967,14 +1154,77 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (!this._toolbar)
             return;
 
-        const visible = this._isTerminal();
-        if (this._toolbar.visible === visible)
+        const terminal = this._isTerminal();
+        const shortcuts = !terminal && this._settings.get_boolean('shortcut-bar');
+        if (this._toolbar.visible === terminal && this._shortcutBar.visible === shortcuts)
             return;
 
-        this._toolbar.visible = visible;
-        if (!visible)
+        this._toolbar.visible = terminal;
+        this._shortcutBar.visible = shortcuts;
+        if (!terminal)
             this._setMods(new Set());
         this._relayout();
+    }
+
+    // --- Shortcut bar and menu -------------------------------------------
+
+    _buildShortcutBar() {
+        const bar = new St.BoxLayout({
+            style_class: 'tk-toolbar tk-shortcuts',
+            x_expand: true,
+            visible: false,
+        });
+
+        const add = (iconName, onClick) => {
+            const button = new St.Button({
+                style_class: 'tk-tool tk-shortcut',
+                child: new St.Icon({style_class: 'tk-shortcut-icon', icon_name: iconName}),
+                can_focus: false,
+            });
+            button.connect('clicked', onClick);
+            bar.add_child(button);
+            return button;
+        };
+        const ctrl = Clutter.KEY_Control_L;
+        const edit = (mods, keyval) => () => {
+            this._sendCombo(mods, keyval);
+            this._forgetContext();
+        };
+
+        add('edit-undo-symbolic', edit([ctrl], Clutter.KEY_z));
+        add('edit-redo-symbolic', edit([ctrl, Clutter.KEY_Shift_L], Clutter.KEY_z));
+        add('edit-paste-symbolic', edit([ctrl], Clutter.KEY_v));
+        this._selectionButtons = [
+            add('edit-cut-symbolic', edit([ctrl], Clutter.KEY_x)),
+            add('edit-copy-symbolic', () => this._sendCombo([ctrl], Clutter.KEY_c)),
+        ];
+        this._setSelection(this._selection);
+
+        bar.add_child(new St.Widget({x_expand: true}));
+        add('emblem-system-symbolic', () => this._openSettings());
+        return bar;
+    }
+
+    // Holding the hide key offers split/merge and the settings
+    _openMenu(touch) {
+        const split = this._settings.get_boolean('split-keyboard');
+        touch.menu = this._isLandscape()
+            ? [split ? 'Merge' : 'Split', 'Settings'] : ['Settings'];
+        touch.mode = 'menu';
+        touch.accents = new AccentPopup(touch.key, touch.menu, this._dark,
+            {widthScale: 2.4, fontScale: 0.26});
+    }
+
+    _menuChoice(choice) {
+        if (choice === 'Split' || choice === 'Merge')
+            this._settings.set_boolean('split-keyboard', choice === 'Split');
+        else if (choice === 'Settings')
+            this._openSettings();
+    }
+
+    _openSettings() {
+        this.close(true);
+        extension?.openPreferences();
     }
 
     _toggleMod(keyval) {
@@ -1099,6 +1349,13 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         case 'shift':
             this._shiftDown(touch);
             break;
+        case 'hide':
+            touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, LONG_PRESS_MS, () => {
+                touch.timer = 0;
+                this._openMenu(touch);
+                return GLib.SOURCE_REMOVE;
+            });
+            break;
         case 'page': {
             // Switch on press so a finger can slide onto a symbol and release
             const fromLetters = this._pageName === 'letters';
@@ -1138,6 +1395,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             break;
         }
         case 'accents':
+        case 'menu':
             touch.accents.selectAt(stageX);
             break;
         case 'trackpad':
@@ -1260,6 +1518,13 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             touch.accents.destroy();
             touch.key.remove_style_pseudo_class('active');
             break;
+        case 'menu': {
+            const choice = touch.accents.selectedText;
+            touch.accents.destroy();
+            touch.key.remove_style_pseudo_class('active');
+            this._menuChoice(choice);
+            break;
+        }
         case 'trackpad':
             this._endTrackpad(touch);
             break;
@@ -1313,12 +1578,8 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     _endTrackpad(touch) {
         this._grid.remove_style_class_name('tk-trackpad');
         touch.key.remove_style_pseudo_class('active');
-        if (touch.moved) {
-            this._history = '';
-            this._lastSurrounding = null;
-            this._lastSpaceTime = 0;
-            Main.inputMethod.request_surrounding();
-        }
+        if (touch.moved)
+            this._forgetContext();
     }
 
     _onCancel(id) {
@@ -1345,10 +1606,6 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             key.resetFlick();
         if (touch.mode === 'trackpad')
             this._grid.remove_style_class_name('tk-trackpad');
-        if (key.spec.kind === 'delete') {
-            const controller = this._keyboardController;
-            this._enqueue(() => controller.toggleDelete(false, touch.alien));
-        }
         if (key.spec.kind === 'shift')
             this._shiftHeld = Math.max(0, this._shiftHeld - 1);
         key.remove_style_pseudo_class('active');

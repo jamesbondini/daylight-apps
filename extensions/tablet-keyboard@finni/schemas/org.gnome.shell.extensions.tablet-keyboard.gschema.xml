@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.tablet-keyboard"
+          path="/org/gnome/shell/extensions/tablet-keyboard/">
+    <key name="portrait-height" type="i">
+      <range min="60" max="140"/>
+      <default>100</default>
+      <summary>Key height in portrait, in percent</summary>
+    </key>
+    <key name="landscape-height" type="i">
+      <range min="60" max="140"/>
+      <default>80</default>
+      <summary>Key height in landscape, in percent</summary>
+    </key>
+    <key name="split-keyboard" type="b">
+      <default>false</default>
+      <summary>Split the keyboard in two halves in landscape</summary>
+    </key>
+    <key name="swipe-symbols" type="b">
+      <default>true</default>
+      <summary>Swipe down on a key to type its digit or symbol</summary>
+    </key>
+    <key name="shortcut-bar" type="b">
+      <default>true</default>
+      <summary>Show undo, redo and paste buttons above the keys</summary>
+    </key>
+    <key name="auto-capitalize" type="b">
+      <default>true</default>
+      <summary>Capitalize the start of sentences</summary>
+    </key>
+    <key name="double-space-period" type="b">
+      <default>true</default>
+      <summary>Double-tap space to type a period</summary>
+    </key>
+    <key name="autocorrect" type="b">
+      <default>true</default>
+      <summary>Fix small mistakes like i, dont and teh</summary>
+    </key>
+    <key name="color-scheme" type="s">
+      <choices>
+        <choice value="system"/>
+        <choice value="light"/>
+        <choice value="dark"/>
+      </choices>
+      <default>'system'</default>
+      <summary>Light or dark keys</summary>
+    </key>
+  </schema>
+</schemalist>

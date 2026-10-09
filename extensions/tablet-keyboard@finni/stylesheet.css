@@ -179,3 +179,12 @@
 .tk-accents.tk-dark .tk-accent {
   color: #ffffff;
 }
+
+/* Shortcut bar */
+.tk-shortcut {
+  min-width: 56px;
+}
+
+.tk-shortcut-icon {
+  icon-size: 20px;
+}

@@ -8,7 +8,7 @@
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import {TabletKeyboard} from './keyboard.js';
+import {TabletKeyboard, setExtension} from './keyboard.js';
 
 function destroyKeyboard(manager) {
     const keyboard = manager._keyboard;
@@ -24,6 +24,7 @@ function destroyKeyboard(manager) {
 
 export default class TabletKeyboardExtension extends Extension {
     enable() {
+        setExtension(this);
         const manager = Main.keyboard;
         const sync = () => this._replaceStockKeyboard();
 
@@ -50,6 +51,7 @@ export default class TabletKeyboardExtension extends Extension {
                 manager._keyboard?.open();
             manager.emit('visibility-changed');
         }
+        setExtension(null);
     }
 
     _replaceStockKeyboard() {
