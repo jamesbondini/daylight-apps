@@ -1,0 +1,6 @@
+{
+  "uuid": "maximize-new-windows@finni",
+  "name": "Maximize New Windows",
+  "description": "Maximizes every new resizable app window. Mutter's auto-maximize only triggers for windows already near screen size, which most apps aren't in portrait.",
+  "shell-version": ["48"]
+}

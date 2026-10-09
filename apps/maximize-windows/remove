@@ -1,0 +1,14 @@
+#!/bin/bash
+# Disable and remove the maximize-new-windows extension.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+UUID=maximize-new-windows@finni
+
+step "Disabling extension"
+gnome_ext_set_enabled "$UUID" false
+
+step "Removing files"
+rm -rf "$HOME/.local/share/gnome-shell/extensions/$UUID"
+
+step "Done"
+info "New windows will open at their normal size again."

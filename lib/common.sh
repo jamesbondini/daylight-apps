@@ -58,3 +58,30 @@ require_terminal() {
     exit 0
   fi
 }
+
+# Enable or disable a GNOME Shell extension. gnome-extensions only knows
+# extensions the shell has loaded, so also edit the enabled-extensions list
+# directly for ones installed during this session.
+gnome_ext_set_enabled() {
+  local uuid="$1" enable="$2"
+  if [ "$enable" = true ]; then
+    gnome-extensions enable "$uuid" 2>/dev/null || true
+  else
+    gnome-extensions disable "$uuid" 2>/dev/null || true
+  fi
+  local current
+  current=$(gsettings get org.gnome.shell enabled-extensions)
+  python3 - "$uuid" "$enable" "$current" <<'PY' | xargs -0 -r gsettings set org.gnome.shell enabled-extensions
+import ast, sys
+uuid, enable, current = sys.argv[1], sys.argv[2] == "true", sys.argv[3]
+items = ast.literal_eval(current.removeprefix("@as ")) or []
+new = [i for i in items if i != uuid] + ([uuid] if enable else [])
+if enable and uuid in items:
+    new = items
+if new != items:
+    print(repr(new), end="")
+PY
+  if [ "$enable" = true ]; then
+    gsettings set org.gnome.shell disable-user-extensions false
+  fi
+}
