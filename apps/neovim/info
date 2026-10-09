@@ -1,0 +1,5 @@
+NAME=Neovim
+SUMMARY=Keyboard-driven text editor for the terminal. Adds an `nvim` command.
+ICON=io.neovim.nvim nvim text-editor-symbolic
+WEBSITE=https://neovim.io
+SETUP_LABEL=Open in Terminal

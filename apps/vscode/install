@@ -1,0 +1,9 @@
+#!/bin/bash
+# Install Visual Studio Code from Flathub.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Installing Visual Studio Code from Flathub (about 150 MB)"
+flatpak_install_app com.visualstudio.code
+
+step "Done"
+info "Press “Open” to start it."

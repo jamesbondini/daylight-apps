@@ -1,0 +1,6 @@
+NAME=Visual Studio Code
+SUMMARY=Microsoft's code editor (official build with the extension marketplace).
+ICON=com.visualstudio.code text-editor-symbolic
+WEBSITE=https://code.visualstudio.com
+OPEN=com.visualstudio.code
+OPEN_LABEL=Open

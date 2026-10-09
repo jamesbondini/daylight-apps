@@ -1,0 +1,11 @@
+#!/bin/bash
+# Uninstall the Neovim Flatpak and its nvim command. Config in ~/.config/nvim is kept.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+WRAPPER="$HOME/.local/bin/nvim"
+step "Removing Neovim"
+flatpak_remove_app io.neovim.nvim
+if grep -q "daylight-apps" "$WRAPPER" 2>/dev/null; then
+  rm -f "$WRAPPER"
+fi
+step "Done"

@@ -1,0 +1,21 @@
+#!/bin/bash
+# Install Neovim from Flathub and add an `nvim` command for it.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+APP=io.neovim.nvim
+WRAPPER="$HOME/.local/bin/nvim"
+
+step "Installing Neovim from Flathub"
+flatpak_install_app "$APP"
+
+if [ -e "$WRAPPER" ] && ! grep -q "daylight-apps" "$WRAPPER" 2>/dev/null; then
+  info "Leaving existing $WRAPPER alone."
+else
+  step "Adding nvim command to ~/.local/bin"
+  mkdir -p "$HOME/.local/bin"
+  printf '#!/bin/sh\n# Added by daylight-apps: run the Neovim Flatpak.\nexec flatpak run io.neovim.nvim "$@"\n' > "$WRAPPER"
+  chmod +x "$WRAPPER"
+fi
+
+step "Done"
+info "Type nvim in a terminal, or press “Open in Terminal”."

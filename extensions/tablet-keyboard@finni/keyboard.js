@@ -1,0 +1,1268 @@
+// An iPad-style key area for GNOME Shell's on-screen keyboard.
+//
+// TabletKeyboard subclasses the shell's Keyboard so showing/hiding, moving the
+// focused window out of the way, emoji and text delivery keep working, and
+// replaces only the key layout and touch handling.
+
+import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
+import Graphene from 'gi://Graphene';
+import St from 'gi://St';
+
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as KeyboardUI from 'resource:///org/gnome/shell/ui/keyboard.js';
+import * as InputSourceManager from 'resource:///org/gnome/shell/ui/status/keyboard.js';
+
+import {buildPages} from './layouts.js';
+
+const LONG_PRESS_MS = 450;
+const TRACKPAD_PRESS_MS = 400;
+const DELETE_REPEAT_MS = 450;
+const SHIFT_DOUBLE_TAP_MS = 350;
+const DOUBLE_SPACE_MS = 1200;
+const TYPING_QUIET_MS = 400;
+const FLICK_START_PX = 10;
+const RESET_MS = 140;
+
+const TERMINAL_WM_CLASS = /ghostty|terminal|kgx|console|alacritty|kitty|foot|wezterm|konsole|xterm/i;
+const {InputContentPurpose: Purpose, InputContentHintFlags: Hint} = Clutter;
+const TEXT_PURPOSES = new Set([Purpose.NORMAL, Purpose.ALPHA, Purpose.NAME]);
+const NUMERIC_PURPOSES = new Set([Purpose.DIGITS, Purpose.NUMBER, Purpose.PHONE, Purpose.PIN]);
+
+function upper(text) {
+    const up = text.toLocaleUpperCase();
+    return [...up].length === 1 ? up : text;
+}
+
+function centerPivot() {
+    return new Graphene.Point({x: 0.5, y: 0.5});
+}
+
+const KeyActor = GObject.registerClass(
+class TabletKeyActor extends St.Widget {
+    _init(spec) {
+        super._init({
+            style_class: 'tk-key',
+            layout_manager: new Clutter.BinLayout(),
+        });
+        this.spec = spec;
+        this._upper = false;
+        this._altScale = 2;
+
+        const looksLikeChar = spec.kind === 'char' || spec.kind === 'space';
+        this.add_style_class_name(looksLikeChar ? 'tk-char' : 'tk-fn');
+        this.add_style_class_name(`tk-${spec.kind}`);
+
+        if (spec.icon) {
+            this._icon = new St.Icon({
+                style_class: 'tk-icon',
+                icon_name: spec.icon,
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            this.add_child(this._icon);
+        } else if (spec.kind !== 'space') {
+            this._label = new St.Label({
+                style_class: spec.kind === 'char' ? 'tk-label' : 'tk-fn-label',
+                text: spec.text ?? spec.label,
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.CENTER,
+                pivot_point: centerPivot(),
+            });
+            this.add_child(this._label);
+        }
+
+        if (spec.alt) {
+            this._alt = new St.Label({
+                style_class: 'tk-alt',
+                text: spec.alt,
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.START,
+                pivot_point: centerPivot(),
+            });
+            this.add_child(this._alt);
+        }
+    }
+
+    get text() {
+        return this._upper ? upper(this.spec.text) : this.spec.text;
+    }
+
+    get accents() {
+        const accents = this.spec.accents ?? [];
+        return this._upper ? accents.map(upper) : accents;
+    }
+
+    setUpper(isUpper) {
+        this._upper = isUpper;
+        if (this.spec.kind === 'char')
+            this._label.text = this.text;
+    }
+
+    setIcon(iconName) {
+        if (this._icon)
+            this._icon.icon_name = iconName;
+    }
+
+    applyMetrics(m) {
+        if (this._label) {
+            const size = this.spec.kind === 'char' ? m.char : m.fn;
+            this._label.style = `font-size: ${size}px;`;
+        }
+        if (this._alt) {
+            this._alt.style = `font-size: ${m.alt}px; margin-top: ${m.altTop}px;`;
+            this._altScale = m.char / m.alt;
+        }
+        if (this._icon)
+            this._icon.icon_size = m.icon;
+    }
+
+    // Swipe-down animation: the small top character slides into the middle
+    // and grows while the main character drops away.
+    setFlick(progress) {
+        if (!this._alt)
+            return;
+
+        const altBox = this._alt.get_allocation_box();
+        const altCenter = (altBox.y1 + altBox.y2) / 2;
+        const scale = 1 + (this._altScale - 1) * progress;
+
+        this._alt.remove_all_transitions();
+        this._label.remove_all_transitions();
+        this._alt.translation_y = (this.height / 2 - altCenter) * progress;
+        this._alt.set_scale(scale, scale);
+        this._alt.opacity = 140 + 115 * progress;
+        this._label.translation_y = this.height * 0.35 * progress;
+        this._label.opacity = 255 * (1 - progress);
+        this._label.set_scale(1 - 0.4 * progress, 1 - 0.4 * progress);
+
+        if (progress >= 0.5)
+            this._alt.add_style_class_name('tk-alt-active');
+        else
+            this._alt.remove_style_class_name('tk-alt-active');
+    }
+
+    resetFlick() {
+        if (!this._alt)
+            return;
+
+        this._alt.remove_style_class_name('tk-alt-active');
+        const params = {duration: RESET_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD};
+        this._alt.ease({...params, translation_y: 0, scale_x: 1, scale_y: 1, opacity: 255});
+        this._label.ease({...params, translation_y: 0, scale_x: 1, scale_y: 1, opacity: 255});
+    }
+});
+
+// Lays the keys out on a grid of `units` per row and finds the key under a
+// point, treating gaps and indents as part of the nearest key.
+const KeyGrid = GObject.registerClass(
+class TabletKeyGrid extends St.Widget {
+    _init() {
+        super._init({
+            style_class: 'tk-grid',
+            reactive: true,
+            x_expand: true,
+            y_expand: true,
+        });
+        this._rows = [];
+        this._units = 1;
+        this._metricsSize = 0;
+        this._metricsId = 0;
+        this.keys = [];
+        this.rowHeight = 1;
+        this.unitWidth = 1;
+        this.connect('destroy', () => {
+            if (this._metricsId)
+                GLib.source_remove(this._metricsId);
+        });
+    }
+
+    setPage(page) {
+        this.destroy_all_children();
+        this.keys = [];
+        this._units = page.units;
+        this._rows = page.rows.map((row, rowIndex) => {
+            let start = 0;
+            const keys = [];
+            for (const spec of row) {
+                const width = spec.width ?? 1;
+                if (spec.kind !== 'gap') {
+                    const key = new KeyActor(spec);
+                    key.rowIndex = rowIndex;
+                    key.start = start;
+                    key.units = width;
+                    this.add_child(key);
+                    keys.push(key);
+                    this.keys.push(key);
+                }
+                start += width;
+            }
+            return keys;
+        });
+        this._metricsSize = 0;
+        this.queue_relayout();
+    }
+
+    vfunc_get_preferred_width(_forHeight) {
+        return [0, 0];
+    }
+
+    vfunc_get_preferred_height(_forWidth) {
+        return [0, 0];
+    }
+
+    vfunc_allocate(box) {
+        this.set_allocation(box);
+        if (this._rows.length === 0)
+            return;
+
+        const content = this.get_theme_node().get_content_box(box);
+        // Children are positioned relative to our own origin
+        const originX = content.x1 - box.x1;
+        const originY = content.y1 - box.y1;
+        const rowHeight = content.get_height() / this._rows.length;
+        const unitWidth = content.get_width() / this._units;
+        const gapY = Math.round(rowHeight * 0.17);
+        const gapX = Math.min(Math.round(unitWidth * 0.14), gapY);
+
+        this.rowHeight = rowHeight;
+        this.unitWidth = unitWidth;
+        this._origin = [originX, originY];
+
+        const childBox = new Clutter.ActorBox();
+        for (const key of this.keys) {
+            const x1 = originX + key.start * unitWidth;
+            const x2 = x1 + key.units * unitWidth;
+            const y1 = originY + key.rowIndex * rowHeight;
+            childBox.set_origin(Math.round(x1 + gapX / 2), Math.round(y1 + gapY / 2));
+            childBox.set_size(
+                Math.round(x2 - x1 - gapX), Math.round(rowHeight - gapY));
+            key.allocate(childBox);
+            key.cell = {x1, x2};
+        }
+
+        const keyHeight = Math.round(rowHeight - gapY);
+        if (keyHeight !== this._metricsSize && !this._metricsId) {
+            // Restyling during allocation would queue another relayout
+            this._metricsId = GLib.idle_add(GLib.PRIORITY_HIGH_IDLE, () => {
+                this._metricsId = 0;
+                this._applyMetrics(keyHeight);
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+    }
+
+    _applyMetrics(keyHeight) {
+        this._metricsSize = keyHeight;
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const px = v => Math.max(1, Math.round(v / scale));
+        this.metrics = {
+            char: px(keyHeight * 0.4),
+            fn: px(keyHeight * 0.26),
+            alt: px(keyHeight * 0.2),
+            altTop: px(keyHeight * 0.06),
+            icon: px(keyHeight * 0.36),
+        };
+        for (const key of this.keys)
+            key.applyMetrics(this.metrics);
+    }
+
+    keyAt(x, y) {
+        if (this._rows.length === 0)
+            return null;
+
+        const [originX, originY] = this._origin ?? [0, 0];
+        const rowIndex = Math.clamp(
+            Math.floor((y - originY) / this.rowHeight), 0, this._rows.length - 1);
+        void originX;
+
+        let best = null, bestDistance = Infinity;
+        for (const key of this._rows[rowIndex]) {
+            if (!key.cell)
+                continue;
+            const distance = x < key.cell.x1 ? key.cell.x1 - x
+                : x > key.cell.x2 ? x - key.cell.x2 : 0;
+            if (distance < bestDistance) {
+                best = key;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+});
+
+// Floating popups live in uiGroup so they can extend above the keyboard.
+const KeyPreview = GObject.registerClass(
+class TabletKeyPreview extends St.Label {
+    _init() {
+        super._init({style_class: 'tk-preview', visible: false});
+        this.clutter_text.x_align = Clutter.ActorAlign.CENTER;
+        Main.layoutManager.uiGroup.add_child(this);
+    }
+
+    showFor(key, text, dark) {
+        const [kx, ky] = key.get_transformed_position();
+        const [kw, kh] = key.get_transformed_size();
+        const width = Math.round(kw * 1.3);
+        const height = Math.round(kh * 1.2);
+        const monitor = Main.layoutManager.keyboardMonitor;
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+
+        this.text = text;
+        this.style = `font-size: ${Math.round(kh * 0.55 / scale)}px; ` +
+            `padding-top: ${Math.round(kh * 0.12 / scale)}px;`;
+        this.set_size(width, height);
+        this.set_position(
+            Math.clamp(Math.round(kx + kw / 2 - width / 2), monitor.x, monitor.x + monitor.width - width),
+            Math.round(ky - height - kh * 0.1));
+        this._setDark(dark);
+        Main.layoutManager.uiGroup.set_child_above_sibling(this, null);
+        this.show();
+    }
+
+    _setDark(dark) {
+        if (dark)
+            this.add_style_class_name('tk-dark');
+        else
+            this.remove_style_class_name('tk-dark');
+    }
+});
+
+const AccentPopup = GObject.registerClass(
+class TabletAccentPopup extends St.BoxLayout {
+    _init(key, items, dark) {
+        super._init({style_class: 'tk-accents'});
+        if (dark)
+            this.add_style_class_name('tk-dark');
+
+        const [kx, ky] = key.get_transformed_position();
+        const [kw, kh] = key.get_transformed_size();
+        const monitor = Main.layoutManager.keyboardMonitor;
+        const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        const cellWidth = Math.round(kw);
+        const width = cellWidth * items.length;
+
+        // Grow to the right of the key, or to the left near the right edge
+        const growLeft = kx + width > monitor.x + monitor.width;
+        const ordered = growLeft ? [...items].reverse() : items;
+
+        this._items = ordered;
+        this._labels = ordered.map(text => {
+            const label = new St.Label({
+                style_class: 'tk-accent',
+                text,
+                y_align: Clutter.ActorAlign.CENTER,
+                style: `font-size: ${Math.round(kh * 0.42 / scale)}px;`,
+            });
+            label.clutter_text.x_align = Clutter.ActorAlign.CENTER;
+            label.set_size(cellWidth, Math.round(kh));
+            this.add_child(label);
+            return label;
+        });
+
+        let x = growLeft ? kx + kw - width : kx;
+        x = Math.clamp(Math.round(x), monitor.x, monitor.x + monitor.width - width);
+        this._x = x;
+        this._cellWidth = cellWidth;
+        this.set_position(x, Math.round(ky - kh * 1.15));
+        Main.layoutManager.uiGroup.add_child(this);
+
+        this.selected = growLeft ? ordered.length - 1 : 0;
+        this._sync();
+    }
+
+    selectAt(stageX) {
+        const index = Math.clamp(
+            Math.floor((stageX - this._x) / this._cellWidth), 0, this._items.length - 1);
+        if (index !== this.selected) {
+            this.selected = index;
+            this._sync();
+        }
+    }
+
+    get selectedText() {
+        return this._items[this.selected];
+    }
+
+    _sync() {
+        this._labels.forEach((label, i) => {
+            if (i === this.selected)
+                label.add_style_pseudo_class('selected');
+            else
+                label.remove_style_pseudo_class('selected');
+        });
+    }
+});
+
+export const TabletKeyboard = GObject.registerClass(
+class TabletKeyboard extends KeyboardUI.Keyboard {
+    _init() {
+        super._init();
+        this.add_style_class_name('tk-keyboard');
+
+        this._interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+        this._interfaceSettings.connectObject('changed::color-scheme',
+            () => this._syncColorScheme(), this);
+        this._syncColorScheme();
+    }
+
+    // Called from the parent constructor via _setupKeyboard()
+    _ensureUi() {
+        if (this._tkLayout)
+            return;
+
+        this._touches = new Map();
+        this._mods = new Set();
+        this._modsLocked = false;
+        this._shiftMode = 'off';
+        this._shiftHeld = 0;
+        this._lastShiftTap = 0;
+        this._lastTapUnlocked = false;
+        this._history = '';
+        this._lastTypeTime = 0;
+        this._lastSpaceTime = 0;
+        this._lastSurrounding = null;
+        this._queue = Promise.resolve();
+        this._pageName = 'letters';
+
+        this._tkLayout = new St.BoxLayout({
+            style_class: 'tk-layout',
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+            y_expand: true,
+        });
+
+        this._toolbar = this._buildToolbar();
+        this._tkLayout.add_child(this._toolbar);
+
+        this._grid = new KeyGrid();
+        this._grid.connect('touch-event', this._onTouchEvent.bind(this));
+        this._grid.connect('button-press-event', this._onButtonEvent.bind(this));
+        this._grid.connect('motion-event', this._onButtonEvent.bind(this));
+        this._grid.connect('button-release-event', this._onButtonEvent.bind(this));
+        this._tkLayout.add_child(this._grid);
+
+        this._aspectContainer.add_child(this._tkLayout);
+        this._currentLayout = this._tkLayout;
+
+        this._preview = new KeyPreview();
+
+        Main.inputMethod.connectObject('surrounding-text-set',
+            this._onSurroundingText.bind(this), this);
+    }
+
+    _onDestroy() {
+        super._onDestroy();
+
+        Main.uiGroup.remove_action(this._panGesture);
+        this._cancelAllTouches();
+        this._preview?.destroy();
+        this._preview = null;
+    }
+
+    _syncColorScheme() {
+        this._dark = this._interfaceSettings.get_string('color-scheme') === 'prefer-dark';
+        if (this._dark) {
+            this.add_style_class_name('tk-dark');
+            this._bottomPanelBox?.add_style_class_name('dark-mode-enabled');
+        } else {
+            this.remove_style_class_name('tk-dark');
+            this._bottomPanelBox?.remove_style_class_name('dark-mode-enabled');
+        }
+        if (this._bottomPanelBox) {
+            this._bottomPanelBox.style = this._dark
+                ? 'background-color: #2b2b2d;' : 'background-color: #d1d3d9;';
+        }
+    }
+
+    // --- Parent overrides ------------------------------------------------
+
+    _updateKeys() {
+        this._ensureUi();
+
+        const group = this._keyboardController.getCurrentGroup();
+        const sources = InputSourceManager.getInputSourceManager().inputSources;
+        this._pages = buildPages(group, Object.keys(sources).length > 1);
+        this._pageName = null;
+        this._syncToolbar();
+        this._setActiveLevel('default');
+    }
+
+    _setActiveLevel(_level) {
+        if (!this._pages)
+            return;
+
+        this._cancelAllTouches();
+        this._setPage(NUMERIC_PURPOSES.has(this._purpose) ? 'numbers' : 'letters');
+        if (this._shiftMode !== 'lock')
+            this._setShift('off');
+        this._updateAutoShift();
+        this._relayout();
+    }
+
+    _setLatched(_latched) {
+    }
+
+    _updateLevelFromHints(userInputHappened) {
+        if (!this._tkLayout)
+            return;
+
+        const hints = this._contentHint ?? 0;
+        if (userInputHappened || hints !== this._lastHints) {
+            this._lastHints = hints;
+            this._resetContext();
+        }
+    }
+
+    _onFocusChanged(focusTracker) {
+        super._onFocusChanged(focusTracker);
+        this._syncToolbar();
+    }
+
+    _relayout() {
+        const monitor = Main.layoutManager.keyboardMonitor;
+        if (!monitor || !this._tkLayout)
+            return;
+
+        const {width, height} = monitor;
+        const gridHeight = height >= width
+            ? width * 0.36 : Math.min(height * 0.42, width * 0.3);
+        const toolbarHeight = this._toolbar.visible ? Math.round(gridHeight * 0.16) : 0;
+
+        this._toolbar.height = toolbarHeight;
+        this._aspectContainer.setRatio(width, gridHeight + toolbarHeight);
+    }
+
+    vfunc_get_preferred_height(forWidth) {
+        const [minH, natH] = St.BoxLayout.prototype.vfunc_get_preferred_height.call(this, forWidth);
+        const monitor = Main.layoutManager.keyboardMonitor;
+        const maxHeight = monitor ? monitor.height * 0.5 : natH;
+        return [Math.min(minH, maxHeight), Math.min(natH, maxHeight)];
+    }
+
+    _panMayRecognize(gesture) {
+        // Downward swipes on the keys are ours (swipe-down characters)
+        const begin = gesture.get_begin_centroid_abs();
+        if (this._grid?.get_transformed_extents().contains_point(begin))
+            return false;
+        return super._panMayRecognize(gesture);
+    }
+
+    _animateHide() {
+        this._cancelAllTouches();
+        super._animateHide();
+    }
+
+    // --- Pages and shift -------------------------------------------------
+
+    _setPage(name) {
+        if (this._pageName === name)
+            return;
+
+        this._pageName = name;
+        this._grid.setPage(this._pages[name]);
+        if (this._grid.metrics) {
+            for (const key of this._grid.keys)
+                key.applyMetrics(this._grid.metrics);
+        }
+        this._syncShiftKeys();
+    }
+
+    _setShift(mode) {
+        this._shiftMode = mode;
+        this._syncShiftKeys();
+    }
+
+    _syncShiftKeys() {
+        const isUpper = this._shiftMode !== 'off';
+        for (const key of this._grid.keys) {
+            if (key.spec.kind === 'char' && this._pageName === 'letters')
+                key.setUpper(isUpper);
+            if (key.spec.kind === 'shift') {
+                key.setIcon(this._shiftMode === 'lock'
+                    ? 'osk-caps-lock-symbolic' : 'osk-shift-symbolic');
+                if (isUpper)
+                    key.add_style_class_name('tk-latched');
+                else
+                    key.remove_style_class_name('tk-latched');
+            }
+        }
+    }
+
+    _shiftDown(touch) {
+        const now = GLib.get_monotonic_time() / 1000;
+        const quick = now - this._lastShiftTap < SHIFT_DOUBLE_TAP_MS;
+
+        if (this._shiftMode === 'lock') {
+            this._setShift('off');
+            this._lastTapUnlocked = true;
+        } else if (quick && !this._lastTapUnlocked) {
+            this._setShift('lock');
+            this._lastTapUnlocked = false;
+        } else {
+            this._setShift(this._shiftMode === 'off' ? 'once' : 'off');
+            this._lastTapUnlocked = false;
+        }
+
+        this._lastShiftTap = now;
+        this._shiftHeld++;
+        touch.typedWhileHeld = false;
+    }
+
+    _shiftUp(touch) {
+        this._shiftHeld = Math.max(0, this._shiftHeld - 1);
+        // Holding shift while typing capitalises only those letters
+        if (touch.typedWhileHeld && this._shiftMode !== 'lock')
+            this._setShift('off');
+    }
+
+    _textAssist() {
+        if (this._isTerminal())
+            return false;
+        if ((this._contentHint ?? 0) & (Hint.LOWERCASE | Hint.HIDDEN_TEXT))
+            return false;
+        return TEXT_PURPOSES.has(this._purpose ?? Purpose.NORMAL);
+    }
+
+    _autoCapWanted() {
+        const hints = this._contentHint ?? 0;
+        if (hints & Hint.UPPERCASE)
+            return true;
+        if (!this._textAssist())
+            return false;
+
+        const text = this._history;
+        if (hints & Hint.TITLECASE)
+            return text.length === 0 || /\s$/.test(text);
+        return text.length === 0 || /[.!?]\s+$/.test(text) || /\n$/.test(text);
+    }
+
+    _updateAutoShift() {
+        if (this._shiftMode === 'lock' || this._shiftHeld > 0 || this._pageName !== 'letters')
+            return;
+
+        if (this._autoCapWanted()) {
+            if (this._shiftMode === 'off')
+                this._setShift('auto');
+        } else if (this._shiftMode === 'auto') {
+            this._setShift('off');
+        }
+    }
+
+    // --- Text context ----------------------------------------------------
+
+    _resetContext() {
+        this._history = '';
+        this._lastSpaceTime = 0;
+        this._lastSurrounding = null;
+        this._updateAutoShift();
+        Main.inputMethod.request_surrounding();
+    }
+
+    _onSurroundingText() {
+        const [text, cursor] = Main.inputMethod.getSurroundingText();
+        if (text === null || text === undefined || cursor === null)
+            return;
+
+        const now = GLib.get_monotonic_time() / 1000;
+        if (now - this._lastTypeTime < TYPING_QUIET_MS)
+            return;
+
+        const before = [...text].slice(0, cursor).join('');
+        if (before === this._lastSurrounding)
+            return;
+
+        this._lastSurrounding = before;
+        this._history = before.slice(-64);
+        this._updateAutoShift();
+    }
+
+    _noteTyped(text) {
+        this._lastTypeTime = GLib.get_monotonic_time() / 1000;
+        this._history = (this._history + text).slice(-64);
+    }
+
+    _noteDeleted() {
+        this._lastTypeTime = GLib.get_monotonic_time() / 1000;
+        this._history = [...this._history].slice(0, -1).join('');
+        this._lastSpaceTime = 0;
+    }
+
+    _isTerminal() {
+        if (this._purpose === Purpose.TERMINAL)
+            return true;
+        const wmClass = this._focusWindow?.get_wm_class() ?? '';
+        return TERMINAL_WM_CLASS.test(wmClass);
+    }
+
+    // --- Text output -----------------------------------------------------
+
+    _enqueue(fn) {
+        this._queue = this._queue.then(fn).catch(logError);
+    }
+
+    _usesInputMethod(withMods) {
+        // IBus input sources (e.g. CJK) need key events routed through the IM
+        const source = InputSourceManager.getInputSourceManager().currentSource;
+        return !withMods && !!Main.inputMethod.currentFocus &&
+            source?.type !== InputSourceManager.INPUT_SOURCE_TYPE_IBUS;
+    }
+
+    _takeMods() {
+        const mods = new Set(this._mods);
+        if (!this._modsLocked)
+            this._setMods(new Set());
+        return mods;
+    }
+
+    _commit(text) {
+        const mods = this._takeMods();
+        const controller = this._keyboardController;
+
+        if (this._usesInputMethod(mods.size > 0))
+            this._enqueue(() => Main.inputMethod.commit(text));
+        else
+            this._enqueue(() => controller.commit(text, mods));
+
+        this._noteTyped(text);
+    }
+
+    _sendKeyval(keyval) {
+        const mods = this._takeMods();
+        const controller = this._keyboardController;
+        this._enqueue(() => {
+            for (const mod of mods)
+                controller.keyvalPress(mod);
+            controller.keyvalPress(keyval);
+            controller.keyvalRelease(keyval);
+            for (const mod of mods)
+                controller.keyvalRelease(mod);
+        });
+    }
+
+    _deleteBackOne() {
+        const controller = this._keyboardController;
+        if (this._usesInputMethod(false)) {
+            this._enqueue(() => Main.inputMethod.delete_surrounding(-1, 1));
+        } else {
+            this._enqueue(() => {
+                controller.keyvalPress(Clutter.KEY_BackSpace);
+                controller.keyvalRelease(Clutter.KEY_BackSpace);
+            });
+        }
+    }
+
+    _typeChar(text) {
+        this._commit(text);
+
+        for (const touch of this._touches.values()) {
+            if (touch.key?.spec.kind === 'shift')
+                touch.typedWhileHeld = true;
+        }
+        if ((this._shiftMode === 'once' || this._shiftMode === 'auto') && this._shiftHeld === 0)
+            this._setShift('off');
+        this._lastSpaceTime = 0;
+        this._updateAutoShift();
+    }
+
+    _typeSpace() {
+        const now = GLib.get_monotonic_time() / 1000;
+        const text = this._history;
+
+        // Double-tap space: replace the first space with ". "
+        if (this._textAssist() && this._mods.size === 0 &&
+            now - this._lastSpaceTime < DOUBLE_SPACE_MS &&
+            text.endsWith(' ') && /[\p{L}\p{N}]$/u.test(text.slice(0, -1))) {
+            this._deleteBackOne();
+            this._noteDeleted();
+            this._commit('. ');
+            this._lastSpaceTime = 0;
+        } else {
+            this._commit(' ');
+            this._lastSpaceTime = now;
+        }
+
+        if (this._shiftMode === 'once' && this._shiftHeld === 0)
+            this._setShift('off');
+        this._updateAutoShift();
+    }
+
+    _typeReturn() {
+        this._sendKeyval(Clutter.KEY_Return);
+        this._noteTyped('\n');
+        this._lastSpaceTime = 0;
+        this._updateAutoShift();
+    }
+
+    _alienFocus() {
+        return !!this._focusWindow?.is_alien();
+    }
+
+    _deleteDown(touch) {
+        const controller = this._keyboardController;
+        const alien = this._alienFocus();
+        touch.alien = alien;
+
+        if (alien) {
+            // X11 clients: delete via the IM, repeating after a hold
+            this._enqueue(() => {
+                controller.toggleDelete(true, true);
+                controller.toggleDelete(false, true);
+            });
+            touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, DELETE_REPEAT_MS, () => {
+                touch.timer = 0;
+                touch.repeating = true;
+                controller.toggleDelete(true, true);
+                return GLib.SOURCE_REMOVE;
+            });
+        } else {
+            // Holds BackSpace down; the client handles key repeat
+            this._enqueue(() => controller.toggleDelete(true, false));
+            touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, DELETE_REPEAT_MS, () => {
+                touch.timer = 0;
+                touch.repeating = true;
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+        this._noteDeleted();
+    }
+
+    _deleteUp(touch) {
+        const controller = this._keyboardController;
+        this._enqueue(() => controller.toggleDelete(false, touch.alien));
+        if (touch.repeating) {
+            // Unknown how much was deleted; wait for the app's surrounding text
+            this._history = '';
+            this._lastSurrounding = null;
+            Main.inputMethod.request_surrounding();
+        }
+        this._updateAutoShift();
+    }
+
+    _switchInputSource() {
+        const manager = InputSourceManager.getInputSourceManager();
+        const sources = Object.values(manager.inputSources).sort((a, b) => a.index - b.index);
+        const current = sources.indexOf(manager.currentSource);
+        sources[(current + 1) % sources.length]?.activate(true);
+    }
+
+    // --- Terminal toolbar ------------------------------------------------
+
+    _buildToolbar() {
+        const toolbar = new St.BoxLayout({
+            style_class: 'tk-toolbar',
+            x_expand: true,
+            visible: false,
+        });
+        this._modButtons = new Map();
+
+        const add = (label, onClick, modKeyval = null) => {
+            const button = new St.Button({
+                style_class: 'tk-tool',
+                label,
+                x_expand: true,
+                can_focus: false,
+            });
+            button.connect('clicked', onClick);
+            toolbar.add_child(button);
+            if (modKeyval)
+                this._modButtons.set(modKeyval, button);
+        };
+        const key = keyval => () => this._sendKeyval(keyval);
+        const text = str => () => this._commit(str);
+
+        add('esc', key(Clutter.KEY_Escape));
+        add('tab', key(Clutter.KEY_Tab));
+        add('ctrl', () => this._toggleMod(Clutter.KEY_Control_L), Clutter.KEY_Control_L);
+        add('alt', () => this._toggleMod(Clutter.KEY_Alt_L), Clutter.KEY_Alt_L);
+        add('~', text('~'));
+        add('|', text('|'));
+        add('/', text('/'));
+        add('-', text('-'));
+        add('←', key(Clutter.KEY_Left));
+        add('↑', key(Clutter.KEY_Up));
+        add('↓', key(Clutter.KEY_Down));
+        add('→', key(Clutter.KEY_Right));
+
+        return toolbar;
+    }
+
+    _syncToolbar() {
+        if (!this._toolbar)
+            return;
+
+        const visible = this._isTerminal();
+        if (this._toolbar.visible === visible)
+            return;
+
+        this._toolbar.visible = visible;
+        if (!visible)
+            this._setMods(new Set());
+        this._relayout();
+    }
+
+    _toggleMod(keyval) {
+        const now = GLib.get_monotonic_time() / 1000;
+        const mods = new Set(this._mods);
+
+        if (mods.has(keyval) && now - (this._lastModTap ?? 0) < SHIFT_DOUBLE_TAP_MS && !this._modsLocked) {
+            // Double-tap locks the modifier on
+            this._modsLocked = true;
+        } else if (mods.has(keyval)) {
+            mods.delete(keyval);
+            this._modsLocked = false;
+        } else {
+            mods.add(keyval);
+        }
+        this._lastModTap = now;
+        this._setMods(mods);
+    }
+
+    _setMods(mods) {
+        this._mods = mods;
+        if (mods.size === 0)
+            this._modsLocked = false;
+        for (const [keyval, button] of this._modButtons ?? []) {
+            if (mods.has(keyval))
+                button.add_style_pseudo_class('checked');
+            else
+                button.remove_style_pseudo_class('checked');
+            if (mods.has(keyval) && this._modsLocked)
+                button.add_style_class_name('tk-locked');
+            else
+                button.remove_style_class_name('tk-locked');
+        }
+    }
+
+    // --- Touch handling --------------------------------------------------
+
+    _onTouchEvent(actor, event) {
+        const type = event.type();
+        const id = event.get_event_sequence()?.get_slot() ?? 0;
+        const [x, y] = this._localCoords(event);
+
+        if (type === Clutter.EventType.TOUCH_BEGIN)
+            this._onBegin(`t${id}`, x, y);
+        else if (type === Clutter.EventType.TOUCH_UPDATE)
+            this._onMove(`t${id}`, x, y);
+        else if (type === Clutter.EventType.TOUCH_END)
+            this._onEnd(`t${id}`);
+        else if (type === Clutter.EventType.TOUCH_CANCEL)
+            this._onCancel(`t${id}`);
+        return Clutter.EVENT_STOP;
+    }
+
+    _onButtonEvent(actor, event) {
+        const type = event.type();
+        const [x, y] = this._localCoords(event);
+
+        if (type === Clutter.EventType.BUTTON_PRESS && event.get_button() === 1)
+            this._onBegin('pointer', x, y);
+        else if (type === Clutter.EventType.MOTION)
+            this._onMove('pointer', x, y);
+        else if (type === Clutter.EventType.BUTTON_RELEASE && event.get_button() === 1)
+            this._onEnd('pointer');
+        return Clutter.EVENT_STOP;
+    }
+
+    _localCoords(event) {
+        const [stageX, stageY] = event.get_coords();
+        const [, x, y] = this._grid.transform_stage_point(stageX, stageY);
+        return [x, y, stageX];
+    }
+
+    _onBegin(id, x, y) {
+        if (this._touches.has(id))
+            this._onCancel(id);
+
+        const key = this._grid.keyAt(x, y);
+        if (!key)
+            return;
+
+        // Rolling typing: a new key press commits pending taps first
+        if (key.spec.kind === 'char' || key.spec.kind === 'space') {
+            for (const other of this._touches.values()) {
+                if (other.mode === 'press' && other.key?.spec.kind === 'char') {
+                    this._releaseKey(other);
+                    other.mode = 'done';
+                }
+            }
+        }
+
+        const touch = {id, key, x0: x, y0: y, x, y, mode: 'press', timer: 0};
+        this._touches.set(id, touch);
+        this._pressKey(touch);
+    }
+
+    _pressKey(touch) {
+        const {key} = touch;
+        key.add_style_pseudo_class('active');
+
+        switch (key.spec.kind) {
+        case 'char':
+            this._preview.showFor(key, key.text, this._dark);
+            if (key.accents.length > 0) {
+                touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, LONG_PRESS_MS, () => {
+                    touch.timer = 0;
+                    this._openAccents(touch);
+                    return GLib.SOURCE_REMOVE;
+                });
+            }
+            break;
+        case 'space':
+            touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, TRACKPAD_PRESS_MS, () => {
+                touch.timer = 0;
+                this._startTrackpad(touch);
+                return GLib.SOURCE_REMOVE;
+            });
+            break;
+        case 'delete':
+            this._deleteDown(touch);
+            break;
+        case 'shift':
+            this._shiftDown(touch);
+            break;
+        case 'page': {
+            // Switch on press so a finger can slide onto a symbol and release
+            const fromLetters = this._pageName === 'letters';
+            this._setPage(key.spec.page);
+            touch.key = this._grid.keyAt(touch.x, touch.y);
+            touch.key?.add_style_pseudo_class('active');
+            touch.slide = {returnToLetters: fromLetters, startKey: touch.key};
+            break;
+        }
+        }
+    }
+
+    _clearTimer(touch) {
+        if (touch.timer) {
+            GLib.source_remove(touch.timer);
+            touch.timer = 0;
+        }
+    }
+
+    _onMove(id, x, y) {
+        const touch = this._touches.get(id);
+        if (!touch)
+            return;
+
+        touch.x = x;
+        touch.y = y;
+
+        switch (touch.mode) {
+        case 'press':
+            this._movePress(touch);
+            break;
+        case 'flick': {
+            const distance = touch.key.height * 0.45;
+            touch.flick = Math.clamp((y - touch.y0 - FLICK_START_PX) / distance, 0, 1);
+            touch.key.setFlick(touch.flick);
+            break;
+        }
+        case 'accents': {
+            const [stageX] = this._grid.apply_transform_to_point(
+                new Graphene.Point3D({x, y, z: 0})).to_vec3().to_float();
+            touch.accents.selectAt(stageX);
+            break;
+        }
+        case 'trackpad':
+            this._moveTrackpad(touch);
+            break;
+        }
+    }
+
+    _movePress(touch) {
+        const {key} = touch;
+        const dx = touch.x - touch.x0;
+        const dy = touch.y - touch.y0;
+
+        if (key?.spec.kind === 'char' && key.spec.alt && !touch.slide &&
+            dy > FLICK_START_PX && dy > Math.abs(dx)) {
+            this._clearTimer(touch);
+            this._preview.hide();
+            touch.mode = 'flick';
+            touch.flick = 0;
+            return;
+        }
+
+        // Sliding onto a different key moves the press there
+        const under = this._grid.keyAt(touch.x, touch.y);
+        if (!under || under === key)
+            return;
+
+        const slidable = k => ['char', 'space', 'return', 'page', 'emoji', 'globe', 'hide'].includes(k.spec.kind);
+        if (key && !slidable(key) || !slidable(under))
+            return;
+
+        this._clearTimer(touch);
+        key?.remove_style_pseudo_class('active');
+        touch.key = under;
+        touch.x0 = touch.x;
+        touch.y0 = touch.y;
+        under.add_style_pseudo_class('active');
+        if (under.spec.kind === 'char') {
+            this._preview.showFor(under, under.text, this._dark);
+            if (under.accents.length > 0 && !touch.slide) {
+                touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, LONG_PRESS_MS, () => {
+                    touch.timer = 0;
+                    this._openAccents(touch);
+                    return GLib.SOURCE_REMOVE;
+                });
+            }
+        } else {
+            this._preview.hide();
+        }
+    }
+
+    _openAccents(touch) {
+        this._preview.hide();
+        touch.mode = 'accents';
+        touch.accents = new AccentPopup(touch.key, touch.key.accents, this._dark);
+    }
+
+    _startTrackpad(touch) {
+        touch.mode = 'trackpad';
+        touch.tx = touch.x;
+        touch.ty = touch.y;
+        this._grid.add_style_class_name('tk-trackpad');
+    }
+
+    _moveTrackpad(touch) {
+        const stepX = this._grid.unitWidth * 0.45;
+        const stepY = this._grid.rowHeight * 0.9;
+
+        while (touch.x - touch.tx >= stepX) {
+            this._sendKeyval(Clutter.KEY_Right);
+            touch.tx += stepX;
+        }
+        while (touch.tx - touch.x >= stepX) {
+            this._sendKeyval(Clutter.KEY_Left);
+            touch.tx -= stepX;
+        }
+        while (touch.y - touch.ty >= stepY) {
+            this._sendKeyval(Clutter.KEY_Down);
+            touch.ty += stepY;
+        }
+        while (touch.ty - touch.y >= stepY) {
+            this._sendKeyval(Clutter.KEY_Up);
+            touch.ty -= stepY;
+        }
+        touch.moved = true;
+    }
+
+    _onEnd(id) {
+        const touch = this._touches.get(id);
+        if (!touch)
+            return;
+
+        this._touches.delete(id);
+        this._clearTimer(touch);
+
+        switch (touch.mode) {
+        case 'press':
+            this._releaseKey(touch);
+            break;
+        case 'flick': {
+            const {key} = touch;
+            if (touch.flick >= 0.5)
+                this._typeChar(key.spec.alt);
+            else
+                this._typeChar(key.text);
+            key.resetFlick();
+            key.remove_style_pseudo_class('active');
+            break;
+        }
+        case 'accents':
+            this._typeChar(touch.accents.selectedText);
+            touch.accents.destroy();
+            touch.key.remove_style_pseudo_class('active');
+            break;
+        case 'trackpad':
+            this._endTrackpad(touch);
+            break;
+        }
+    }
+
+    _releaseKey(touch) {
+        const {key} = touch;
+        if (!key)
+            return;
+
+        key.remove_style_pseudo_class('active');
+        if (touch.key.spec.kind === 'char')
+            this._preview.hide();
+
+        switch (key.spec.kind) {
+        case 'char':
+            this._typeChar(key.text);
+            // A symbol picked by sliding from "123" returns to the letters
+            if (touch.slide?.returnToLetters && key !== touch.slide.startKey)
+                this._setPage('letters');
+            break;
+        case 'space':
+            this._typeSpace();
+            break;
+        case 'return':
+            this._typeReturn();
+            break;
+        case 'delete':
+            this._deleteUp(touch);
+            break;
+        case 'shift':
+            this._shiftUp(touch);
+            break;
+        case 'page':
+            if (touch.slide && key !== touch.slide.startKey)
+                this._setPage(key.spec.page);
+            break;
+        case 'emoji':
+            this._toggleEmoji();
+            break;
+        case 'globe':
+            this._switchInputSource();
+            break;
+        case 'hide':
+            this.close(true);
+            break;
+        }
+    }
+
+    _endTrackpad(touch) {
+        this._grid.remove_style_class_name('tk-trackpad');
+        touch.key.remove_style_pseudo_class('active');
+        if (touch.moved) {
+            this._history = '';
+            this._lastSurrounding = null;
+            this._lastSpaceTime = 0;
+            Main.inputMethod.request_surrounding();
+        }
+    }
+
+    _onCancel(id) {
+        const touch = this._touches.get(id);
+        if (!touch)
+            return;
+
+        this._touches.delete(id);
+        this._clearTimer(touch);
+        this._preview?.hide();
+        touch.accents?.destroy();
+        if (touch.mode === 'flick')
+            touch.key.resetFlick();
+        if (touch.mode === 'trackpad')
+            this._grid.remove_style_class_name('tk-trackpad');
+        if (touch.key?.spec.kind === 'delete')
+            this._enqueue(() => this._keyboardController.toggleDelete(false, touch.alien));
+        if (touch.key?.spec.kind === 'shift')
+            this._shiftHeld = Math.max(0, this._shiftHeld - 1);
+        if (!touch.key?.is_finalized?.())
+            touch.key?.remove_style_pseudo_class('active');
+    }
+
+    _cancelAllTouches() {
+        for (const id of [...(this._touches?.keys() ?? [])])
+            this._onCancel(id);
+    }
+});

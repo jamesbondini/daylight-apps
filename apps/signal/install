@@ -1,0 +1,9 @@
+#!/bin/bash
+# Install Signal from Flathub.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Installing Signal from Flathub"
+flatpak_install_app org.signal.Signal
+
+step "Done"
+info "Press “Open” to start it."
