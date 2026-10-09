@@ -37,6 +37,8 @@ cd ~/Projects/daylight-apps && git pull
 | Maestral  | Python venv in `~/.local/share/maestral-venv` + systemd user service | Link Dropbox account (opens a terminal)     |
 | Tailscale | `apk add tailscale tailscale-systemd` (password prompt) | `tailscale up`; login link shows as a button |
 | 1Password | Flathub `com.onepassword.OnePassword` (user)    | Open the app and sign in                    |
+| LocalSend | Flathub `org.localsend.localsend_app` (user) | None |
+| Obsidian  | Flathub `md.obsidian.Obsidian` (user) | Open the app and pick a vault |
 | Claude Code | Official native installer (`claude.ai/install.sh`, arm64-musl) + `libgcc libstdc++ ripgrep` | Opens `claude` in a terminal to sign in |
 | Maximize New Windows | Bundled GNOME Shell extension (`extensions/maximize-new-windows@finni`), see [dc-1-pmos#10](https://github.com/denysvitali/dc-1-pmos/issues/10) | None; log out and in if it was newly installed |
 
@@ -52,7 +54,9 @@ Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
 - `setup` (optional): post-install step. Call `require_terminal "$0"` if it needs keyboard input.
 
 Scripts source `lib/common.sh` for `step`, `info`, `fail`, `as_root` (one polkit prompt per
-call), `apk_present`, `flatpak_present`, `in_terminal` and `require_terminal`.
+call), `apk_present`, `apk_add_cmd`/`apk_del_cmd`, `flatpak_install_app`/`flatpak_status`/
+`flatpak_remove_app`, `gnome_ext_set_enabled`, `in_terminal` and `require_terminal`.
+A Flathub app needs only three one-line scripts; see `apps/localsend/`.
 Every script also works directly from a terminal, e.g. `apps/tailscale/install`.
 URLs printed by a script become clickable buttons in the app.
 

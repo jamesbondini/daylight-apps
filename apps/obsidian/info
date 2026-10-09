@@ -1,0 +1,6 @@
+NAME=Obsidian
+SUMMARY=Markdown notes and knowledge base. Your vaults are plain files on this device.
+ICON=md.obsidian.Obsidian accessories-text-editor-symbolic
+WEBSITE=https://obsidian.md
+OPEN=md.obsidian.Obsidian
+OPEN_LABEL=Open

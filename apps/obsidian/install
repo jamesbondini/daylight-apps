@@ -1,0 +1,9 @@
+#!/bin/bash
+# Install Obsidian from Flathub.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Installing Obsidian from Flathub (about 235 MB)"
+flatpak_install_app md.obsidian.Obsidian
+
+step "Done"
+info "Press “Open” to start it."

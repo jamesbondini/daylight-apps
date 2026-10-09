@@ -39,6 +39,20 @@ apk_del_cmd() {
 
 flatpak_present() { flatpak info "$1" >/dev/null 2>&1; }
 
+# Flathub apps, installed per-user (no root needed).
+flatpak_install_app() {
+  flatpak install --user -y --noninteractive flathub "$1"
+}
+flatpak_status() {
+  flatpak_present "$1" || return 1
+  local ver
+  ver=$(flatpak info "$1" 2>/dev/null | awk -F': *' '/Version:/ {print $2; exit}')
+  echo "v${ver:-?} · Flatpak"
+}
+flatpak_remove_app() {
+  flatpak uninstall -y --noninteractive "$1"
+}
+
 # Open a command in a Ghostty window (reusing the main, software-GL instance),
 # keeping it open afterwards so the user can read the result.
 in_terminal() {

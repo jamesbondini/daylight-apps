@@ -1,0 +1,9 @@
+#!/bin/bash
+# Install LocalSend from Flathub.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Installing LocalSend from Flathub"
+flatpak_install_app org.localsend.localsend_app
+
+step "Done"
+info "Press “Open” to start it."

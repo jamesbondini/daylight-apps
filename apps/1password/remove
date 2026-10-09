@@ -3,5 +3,5 @@
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
 step "Removing 1Password"
-flatpak uninstall -y --noninteractive com.onepassword.OnePassword
+flatpak_remove_app com.onepassword.OnePassword
 step "Done"

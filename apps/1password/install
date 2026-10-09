@@ -2,9 +2,8 @@
 # Install the 1Password desktop app from Flathub (per-user, no root needed).
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-APP=com.onepassword.OnePassword
 step "Installing 1Password from Flathub (this is a large download)"
-flatpak install --user -y --noninteractive flathub "$APP"
+flatpak_install_app com.onepassword.OnePassword
 
 step "Done"
 info "Press “Open” to sign in."
