@@ -1,0 +1,6 @@
+{
+  "uuid": "tablet-keyboard@finni",
+  "name": "Tablet Keyboard",
+  "description": "iPad-style on-screen keyboard: swipe down on a key for its number or symbol, double-tap space for a period, auto-capitals, caps lock, hold space to move the cursor, hold a letter for accents, key previews. Adds an Esc/Tab/Ctrl/arrows row in terminals.",
+  "shell-version": ["48"]
+}

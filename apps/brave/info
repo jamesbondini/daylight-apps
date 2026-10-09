@@ -1,0 +1,6 @@
+NAME=Brave
+SUMMARY=Private Chromium-based browser, trimmed like Brave Origin: no Rewards, Wallet, VPN, Leo AI, News or telemetry.
+ICON=com.brave.Browser web-browser-symbolic
+WEBSITE=https://brave.com
+OPEN=com.brave.Browser
+OPEN_LABEL=Open

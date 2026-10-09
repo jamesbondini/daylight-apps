@@ -1,0 +1,20 @@
+#!/bin/bash
+# Install Brave from Flathub and switch off its extras with a managed policy,
+# approximating Brave Origin (which has no build for musl systems).
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+APP=com.brave.Browser
+POLICY_SRC="$(dirname "$(readlink -f "$0")")/policy.json"
+POLICY=/etc/brave/policies/managed/daylight-apps.json
+
+step "Installing Brave from Flathub"
+flatpak_install_app "$APP"
+
+# The Flatpak reads host /etc/brave/policies, so writing there needs root.
+if ! cmp -s "$POLICY_SRC" "$POLICY"; then
+  step "Turning off Rewards, Wallet, VPN, Leo AI, News and telemetry (asks for your password)"
+  as_root "install -Dm644 '$POLICY_SRC' '$POLICY'"
+fi
+
+step "Done"
+info "Restart Brave if it was open. brave://policy lists the applied settings."

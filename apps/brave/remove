@@ -1,0 +1,11 @@
+#!/bin/bash
+# Uninstall the Brave Flatpak and its policy file. Your profile in ~/.var/app is kept.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Removing Brave"
+flatpak_remove_app com.brave.Browser
+if [ -e /etc/brave/policies/managed/daylight-apps.json ]; then
+  step "Removing policy file (asks for your password)"
+  as_root "rm -f /etc/brave/policies/managed/daylight-apps.json; rmdir -p /etc/brave/policies/managed 2>/dev/null || true"
+fi
+step "Done"

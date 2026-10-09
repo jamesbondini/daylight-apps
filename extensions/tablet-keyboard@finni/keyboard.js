@@ -273,10 +273,9 @@ class TabletKeyGrid extends St.Widget {
         if (this._rows.length === 0)
             return null;
 
-        const [originX, originY] = this._origin ?? [0, 0];
+        const originY = this._origin?.[1] ?? 0;
         const rowIndex = Math.clamp(
             Math.floor((y - originY) / this.rowHeight), 0, this._rows.length - 1);
-        void originX;
 
         let best = null, bestDistance = Infinity;
         for (const key of this._rows[rowIndex]) {
@@ -490,6 +489,13 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._setActiveLevel('default');
     }
 
+    _onPurposeChanged(controller, purpose) {
+        // Apps may resend an unchanged purpose while typing
+        if (purpose === this._purpose)
+            return;
+        super._onPurposeChanged(controller, purpose);
+    }
+
     _setActiveLevel(_level) {
         if (!this._pages)
             return;
@@ -561,6 +567,13 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (this._pageName === name)
             return;
 
+        // The old keys are about to go away
+        for (const touch of this._touches.values()) {
+            this._abandonTouch(touch);
+            touch.mode = 'done';
+            touch.key = null;
+        }
+
         this._pageName = name;
         this._grid.setPage(this._pages[name]);
         if (this._grid.metrics) {
@@ -568,6 +581,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
                 key.applyMetrics(this._grid.metrics);
         }
         this._syncShiftKeys();
+        this._updateAutoShift();
     }
 
     _setShift(mode) {
@@ -941,12 +955,12 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     _onTouchEvent(actor, event) {
         const type = event.type();
         const id = event.get_event_sequence()?.get_slot() ?? 0;
-        const [x, y] = this._localCoords(event);
+        const [x, y, stageX] = this._localCoords(event);
 
         if (type === Clutter.EventType.TOUCH_BEGIN)
             this._onBegin(`t${id}`, x, y);
         else if (type === Clutter.EventType.TOUCH_UPDATE)
-            this._onMove(`t${id}`, x, y);
+            this._onMove(`t${id}`, x, y, stageX);
         else if (type === Clutter.EventType.TOUCH_END)
             this._onEnd(`t${id}`);
         else if (type === Clutter.EventType.TOUCH_CANCEL)
@@ -956,12 +970,12 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
     _onButtonEvent(actor, event) {
         const type = event.type();
-        const [x, y] = this._localCoords(event);
+        const [x, y, stageX] = this._localCoords(event);
 
         if (type === Clutter.EventType.BUTTON_PRESS && event.get_button() === 1)
             this._onBegin('pointer', x, y);
         else if (type === Clutter.EventType.MOTION)
-            this._onMove('pointer', x, y);
+            this._onMove('pointer', x, y, stageX);
         else if (type === Clutter.EventType.BUTTON_RELEASE && event.get_button() === 1)
             this._onEnd('pointer');
         return Clutter.EVENT_STOP;
@@ -985,6 +999,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (key.spec.kind === 'char' || key.spec.kind === 'space') {
             for (const other of this._touches.values()) {
                 if (other.mode === 'press' && other.key?.spec.kind === 'char') {
+                    this._clearTimer(other);
                     this._releaseKey(other);
                     other.mode = 'done';
                 }
@@ -1028,6 +1043,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             // Switch on press so a finger can slide onto a symbol and release
             const fromLetters = this._pageName === 'letters';
             this._setPage(key.spec.page);
+            touch.mode = 'press';
             touch.key = this._grid.keyAt(touch.x, touch.y);
             touch.key?.add_style_pseudo_class('active');
             touch.slide = {returnToLetters: fromLetters, startKey: touch.key};
@@ -1043,7 +1059,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         }
     }
 
-    _onMove(id, x, y) {
+    _onMove(id, x, y, stageX) {
         const touch = this._touches.get(id);
         if (!touch)
             return;
@@ -1061,12 +1077,9 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             touch.key.setFlick(touch.flick);
             break;
         }
-        case 'accents': {
-            const [stageX] = this._grid.apply_transform_to_point(
-                new Graphene.Point3D({x, y, z: 0})).to_vec3().to_float();
+        case 'accents':
             touch.accents.selectAt(stageX);
             break;
-        }
         case 'trackpad':
             this._moveTrackpad(touch);
             break;
@@ -1191,7 +1204,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             return;
 
         key.remove_style_pseudo_class('active');
-        if (touch.key.spec.kind === 'char')
+        if (key.spec.kind === 'char')
             this._preview.hide();
 
         switch (key.spec.kind) {
@@ -1246,19 +1259,31 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             return;
 
         this._touches.delete(id);
+        this._abandonTouch(touch);
+    }
+
+    // Undo a touch's side effects without typing anything
+    _abandonTouch(touch) {
         this._clearTimer(touch);
         this._preview?.hide();
         touch.accents?.destroy();
+        touch.accents = null;
+
+        const {key} = touch;
+        if (!key || touch.mode === 'done')
+            return;
+
         if (touch.mode === 'flick')
-            touch.key.resetFlick();
+            key.resetFlick();
         if (touch.mode === 'trackpad')
             this._grid.remove_style_class_name('tk-trackpad');
-        if (touch.key?.spec.kind === 'delete')
-            this._enqueue(() => this._keyboardController.toggleDelete(false, touch.alien));
-        if (touch.key?.spec.kind === 'shift')
+        if (key.spec.kind === 'delete') {
+            const controller = this._keyboardController;
+            this._enqueue(() => controller.toggleDelete(false, touch.alien));
+        }
+        if (key.spec.kind === 'shift')
             this._shiftHeld = Math.max(0, this._shiftHeld - 1);
-        if (!touch.key?.is_finalized?.())
-            touch.key?.remove_style_pseudo_class('active');
+        key.remove_style_pseudo_class('active');
     }
 
     _cancelAllTouches() {
