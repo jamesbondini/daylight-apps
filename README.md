@@ -1,9 +1,34 @@
 # Daylight Apps
 
-A small GTK/libadwaita installer for this DC-1 (Nura / postmarketOS, aarch64, musl),
+A small GTK/libadwaita installer for the Daylight DC-1 (Nura / postmarketOS, aarch64, musl),
 modelled on Omarchy's `omarchy-install-*` / `omarchy-installed-*` / `omarchy-remove-*` scripts.
 
-Run `./install.sh` once to add it to the app grid, then open **Daylight Apps**.
+## Getting started
+
+Install the dependencies (most are already present on Nura with GNOME):
+
+```sh
+sudo apk add git python3 py3-gobject3 gtk4.0 libadwaita
+```
+
+Download Daylight Apps and add it to the app grid:
+
+```sh
+git clone https://github.com/jamesbondini/daylight-apps.git ~/Projects/daylight-apps
+cd ~/Projects/daylight-apps
+./install.sh
+```
+
+Then open **Daylight Apps** from the app grid, or run `daylight-apps` in a terminal.
+
+To update later:
+
+```sh
+cd ~/Projects/daylight-apps && git pull
+```
+
+`install.sh` links to the cloned folder, so keep it where you cloned it
+(re-run `./install.sh` if you move it).
 
 ## Apps
 
