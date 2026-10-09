@@ -1,0 +1,29 @@
+#!/bin/bash
+# Install Claude Code with Anthropic's native installer (handles arm64 + musl).
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+# Alpine/musl needs these system libraries; ripgrep powers its file search.
+DEPS=(libgcc libstdc++ ripgrep)
+if ! apk_present "${DEPS[@]}"; then
+  step "Installing dependencies: ${DEPS[*]} (asks for your password)"
+  as_root "$(apk_add_cmd "${DEPS[@]}")"
+fi
+
+step "Running the official Claude Code installer"
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Use the system ripgrep on musl, as Anthropic's docs recommend for Alpine.
+SETTINGS="$HOME/.claude/settings.json"
+step "Setting USE_BUILTIN_RIPGREP=0 in $SETTINGS"
+mkdir -p "$HOME/.claude"
+python3 - "$SETTINGS" <<'PY'
+import json, os, sys
+path = sys.argv[1]
+data = json.load(open(path)) if os.path.exists(path) and os.path.getsize(path) else {}
+data.setdefault("env", {}).setdefault("USE_BUILTIN_RIPGREP", "0")
+json.dump(data, open(path, "w"), indent=2)
+PY
+
+step "Done"
+"$HOME/.local/bin/claude" --version
+info "Press “Open in Terminal” to sign in and start using it."

@@ -1,0 +1,10 @@
+#!/bin/bash
+# Remove the native Claude Code install. Keeps ~/.claude (settings, history).
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Removing Claude Code"
+rm -f "$HOME/.local/bin/claude"
+rm -rf "$HOME/.local/share/claude"
+
+step "Done"
+info "Kept your settings and history in ~/.claude and ~/.claude.json."
