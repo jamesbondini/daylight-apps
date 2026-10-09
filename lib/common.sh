@@ -26,6 +26,17 @@ apk_present() {
   for pkg in "$@"; do apk info -e "$pkg" >/dev/null 2>&1 || return 1; done
 }
 
+# Shell snippets for use inside as_root. apk can exit non-zero because of an
+# unrelated broken package, so check the result instead of trusting the exit code.
+apk_add_cmd() {
+  printf 'apk add %s || true\n' "$*"
+  printf 'for p in %s; do apk info -e "$p" >/dev/null || { echo "Package $p did not install" >&2; exit 1; }; done\n' "$*"
+}
+apk_del_cmd() {
+  printf 'apk del %s || true\n' "$*"
+  printf 'for p in %s; do ! apk info -e "$p" >/dev/null || { echo "Package $p was not removed" >&2; exit 1; }; done\n' "$*"
+}
+
 flatpak_present() { flatpak info "$1" >/dev/null 2>&1; }
 
 # Open a command in a Ghostty window (reusing the main, software-GL instance),

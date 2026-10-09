@@ -8,6 +8,6 @@ tailscale down 2>/dev/null || true
 step "Removing tailscale (asks for your password)"
 as_root "
   systemctl disable --now tailscaled.service 2>/dev/null || true
-  apk del tailscale tailscale-systemd
+  $(apk_del_cmd tailscale tailscale-systemd)
 "
 step "Done"
