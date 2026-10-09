@@ -224,7 +224,21 @@ class TabletKeyGrid extends St.Widget {
             return keys;
         });
         this._metricsSize = 0;
+        this._updateCells();
         this.queue_relayout();
+    }
+
+    // Hit areas, also needed right after setPage() before the next allocation
+    _updateCells() {
+        if (!this._contentWidth)
+            return;
+
+        const [originX] = this._origin;
+        const unitWidth = this._contentWidth / this._units;
+        for (const key of this.keys) {
+            const x1 = originX + key.start * unitWidth;
+            key.cell = {x1, x2: x1 + key.units * unitWidth};
+        }
     }
 
     vfunc_get_preferred_width(_forHeight) {
@@ -254,6 +268,8 @@ class TabletKeyGrid extends St.Widget {
         this.rowHeight = rowHeight;
         this.unitWidth = unitWidth;
         this._origin = [originX, originY];
+        this._contentWidth = content.get_width();
+        this._updateCells();
 
         const childBox = new Clutter.ActorBox();
         for (const key of this.keys) {
@@ -264,7 +280,6 @@ class TabletKeyGrid extends St.Widget {
             childBox.set_size(
                 Math.round(x2 - x1 - gapX), Math.round(rowHeight - gapY));
             key.allocate(childBox);
-            key.cell = {x1, x2};
         }
 
         const keyHeight = Math.round(rowHeight - gapY);
@@ -1149,6 +1164,14 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         const under = this._grid.keyAt(touch.x, touch.y);
         if (!under || under === key)
             return;
+
+        // After a page switch the finger starts on the new page's key there
+        if (touch.slide && !touch.slide.startKey) {
+            touch.key = under;
+            touch.slide.startKey = under;
+            under.add_style_pseudo_class('active');
+            return;
+        }
 
         const slidable = k => ['char', 'space', 'return', 'page', 'emoji', 'globe', 'hide'].includes(k.spec.kind);
         if (key && !slidable(key) || !slidable(under))
