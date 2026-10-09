@@ -39,6 +39,7 @@ cd ~/Projects/daylight-apps && git pull
 | 1Password | Flathub `com.onepassword.OnePassword` (user)    | Open the app and sign in                    |
 | LocalSend | Flathub `org.localsend.localsend_app` (user) | None |
 | Obsidian  | Flathub `md.obsidian.Obsidian` (user) | Open the app and pick a vault |
+| Déjà Dup  | Flathub `org.gnome.DejaDup` (user) | Open the app and choose what to back up and where |
 | Claude Code | Official native installer (`claude.ai/install.sh`, arm64-musl) + `libgcc libstdc++ ripgrep` | Opens `claude` in a terminal to sign in |
 | Maximize New Windows | Bundled GNOME Shell extension (`extensions/maximize-new-windows@finni`), see [dc-1-pmos#10](https://github.com/denysvitali/dc-1-pmos/issues/10) | None; log out and in if it was newly installed |
 

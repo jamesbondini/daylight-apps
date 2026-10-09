@@ -1,0 +1,9 @@
+#!/bin/bash
+# Install Déjà Dup from Flathub.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Installing Déjà Dup from Flathub"
+flatpak_install_app org.gnome.DejaDup
+
+step "Done"
+info "Press “Open” to choose what to back up and where."

@@ -1,0 +1,6 @@
+NAME=Déjà Dup Backups
+SUMMARY=Simple encrypted backups of your files to a drive, a server or the cloud, on a schedule.
+ICON=org.gnome.DejaDup drive-harddisk-symbolic
+WEBSITE=https://apps.gnome.org/DejaDup/
+OPEN=org.gnome.DejaDup
+OPEN_LABEL=Open

@@ -1,0 +1,8 @@
+#!/bin/bash
+# Uninstall the Déjà Dup Flatpak. Existing backups are not touched.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Removing Déjà Dup"
+flatpak_remove_app org.gnome.DejaDup
+step "Done"
+info "Your existing backups were not touched."
