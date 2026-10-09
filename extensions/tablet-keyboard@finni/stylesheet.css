@@ -1,0 +1,181 @@
+/* iPad-style light and dark keyboard. Sizes of labels and icons are set from
+ * code, relative to the key size. */
+
+#keyboard.tk-keyboard {
+  background-color: #d1d3d9;
+  box-shadow: none;
+  padding-top: 0;
+}
+
+#keyboard.tk-keyboard.tk-dark {
+  background-color: #2b2b2d;
+}
+
+.tk-grid {
+  padding: 8px 5px 2px 5px;
+}
+
+.tk-key {
+  border-radius: 8px;
+  color: #000000;
+}
+
+.tk-key.tk-char {
+  background-color: #ffffff;
+  box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.3);
+}
+
+.tk-key.tk-fn {
+  background-color: #abb0bb;
+  box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.3);
+}
+
+.tk-key.tk-char:active {
+  background-color: #abb0bb;
+}
+
+.tk-key.tk-fn:active,
+.tk-key.tk-latched {
+  background-color: #ffffff;
+}
+
+.tk-label {
+  font-weight: normal;
+}
+
+.tk-fn-label {
+  font-weight: normal;
+}
+
+.tk-alt {
+  color: #8a8a8e;
+}
+
+.tk-alt.tk-alt-active {
+  color: #000000;
+}
+
+.tk-icon {
+  color: #000000;
+}
+
+/* Space-bar trackpad: keys go blank */
+.tk-trackpad .tk-key,
+.tk-trackpad .tk-key:active {
+  background-color: rgba(255, 255, 255, 0.35);
+  box-shadow: none;
+}
+
+.tk-trackpad .tk-label,
+.tk-trackpad .tk-fn-label,
+.tk-trackpad .tk-alt,
+.tk-trackpad .tk-icon {
+  color: transparent;
+}
+
+/* Terminal row */
+.tk-toolbar {
+  padding: 4px 5px 0 5px;
+  spacing: 4px;
+}
+
+.tk-tool {
+  border-radius: 8px;
+  color: #000000;
+  font-size: 15px;
+  background-color: transparent;
+}
+
+.tk-tool:active,
+.tk-tool:checked {
+  background-color: #ffffff;
+}
+
+.tk-tool.tk-locked {
+  background-color: #ffffff;
+  color: #0a84ff;
+  font-weight: bold;
+}
+
+/* Key preview and accent popups */
+.tk-preview,
+.tk-accents {
+  background-color: #ffffff;
+  color: #000000;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.35);
+}
+
+.tk-accents {
+  padding: 0;
+}
+
+.tk-accent {
+  border-radius: 8px;
+  color: #000000;
+}
+
+.tk-accent:selected {
+  background-color: #0a84ff;
+  color: #ffffff;
+}
+
+/* Dark */
+.tk-dark .tk-key {
+  color: #ffffff;
+}
+
+.tk-dark .tk-key.tk-char {
+  background-color: #6b6b6d;
+  box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.6);
+}
+
+.tk-dark .tk-key.tk-fn {
+  background-color: #464648;
+  box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.6);
+}
+
+.tk-dark .tk-key.tk-char:active {
+  background-color: #464648;
+}
+
+.tk-dark .tk-key.tk-fn:active,
+.tk-dark .tk-key.tk-latched {
+  background-color: #6b6b6d;
+}
+
+.tk-dark .tk-key.tk-latched .tk-icon {
+  color: #ffffff;
+}
+
+.tk-dark .tk-alt {
+  color: #a4a4a8;
+}
+
+.tk-dark .tk-alt.tk-alt-active,
+.tk-dark .tk-icon,
+.tk-dark .tk-tool {
+  color: #ffffff;
+}
+
+.tk-dark .tk-tool:active,
+.tk-dark .tk-tool:checked,
+.tk-dark .tk-tool.tk-locked {
+  background-color: #6b6b6d;
+}
+
+.tk-dark.tk-trackpad .tk-key,
+.tk-dark .tk-trackpad .tk-key,
+.tk-dark .tk-trackpad .tk-key:active {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.tk-preview.tk-dark,
+.tk-accents.tk-dark {
+  background-color: #6b6b6d;
+  color: #ffffff;
+}
+
+.tk-accents.tk-dark .tk-accent {
+  color: #ffffff;
+}

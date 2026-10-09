@@ -28,8 +28,10 @@ const RESET_MS = 140;
 
 const TERMINAL_WM_CLASS = /ghostty|terminal|kgx|console|alacritty|kitty|foot|wezterm|konsole|xterm/i;
 const {InputContentPurpose: Purpose, InputContentHintFlags: Hint} = Clutter;
-const TEXT_PURPOSES = new Set([Purpose.NORMAL, Purpose.ALPHA, Purpose.NAME]);
-const NUMERIC_PURPOSES = new Set([Purpose.DIGITS, Purpose.NUMBER, Purpose.PHONE, Purpose.PIN]);
+// Not every purpose exists in every Clutter version
+const purposes = (...names) => new Set(names.map(n => Purpose[n]).filter(p => p !== undefined));
+const TEXT_PURPOSES = purposes('NORMAL', 'ALPHA', 'NAME');
+const NUMERIC_PURPOSES = purposes('DIGITS', 'NUMBER', 'PHONE', 'PIN');
 
 function upper(text) {
     const up = text.toLocaleUpperCase();
@@ -43,10 +45,7 @@ function centerPivot() {
 const KeyActor = GObject.registerClass(
 class TabletKeyActor extends St.Widget {
     _init(spec) {
-        super._init({
-            style_class: 'tk-key',
-            layout_manager: new Clutter.BinLayout(),
-        });
+        super._init({style_class: 'tk-key'});
         this.spec = spec;
         this._upper = false;
         this._altScale = 2;
@@ -59,16 +58,12 @@ class TabletKeyActor extends St.Widget {
             this._icon = new St.Icon({
                 style_class: 'tk-icon',
                 icon_name: spec.icon,
-                x_align: Clutter.ActorAlign.CENTER,
-                y_align: Clutter.ActorAlign.CENTER,
             });
             this.add_child(this._icon);
         } else if (spec.kind !== 'space') {
             this._label = new St.Label({
                 style_class: spec.kind === 'char' ? 'tk-label' : 'tk-fn-label',
                 text: spec.text ?? spec.label,
-                x_align: Clutter.ActorAlign.CENTER,
-                y_align: Clutter.ActorAlign.CENTER,
                 pivot_point: centerPivot(),
             });
             this.add_child(this._label);
@@ -78,8 +73,6 @@ class TabletKeyActor extends St.Widget {
             this._alt = new St.Label({
                 style_class: 'tk-alt',
                 text: spec.alt,
-                x_align: Clutter.ActorAlign.CENTER,
-                y_align: Clutter.ActorAlign.START,
                 pivot_point: centerPivot(),
             });
             this.add_child(this._alt);
@@ -112,11 +105,38 @@ class TabletKeyActor extends St.Widget {
             this._label.style = `font-size: ${size}px;`;
         }
         if (this._alt) {
-            this._alt.style = `font-size: ${m.alt}px; margin-top: ${m.altTop}px;`;
+            this._alt.style = `font-size: ${m.alt}px;`;
             this._altScale = m.char / m.alt;
         }
         if (this._icon)
             this._icon.icon_size = m.icon;
+    }
+
+    vfunc_allocate(box) {
+        this.set_allocation(box);
+        const width = box.get_width();
+        const height = box.get_height();
+
+        // Center a child horizontally with its middle at centerY
+        const place = (child, centerY) => {
+            const [, , natW, natH] = child.get_preferred_size();
+            const childBox = new Clutter.ActorBox();
+            childBox.set_origin(
+                Math.round((width - natW) / 2), Math.round(centerY - natH / 2));
+            childBox.set_size(natW, natH);
+            child.allocate(childBox);
+        };
+
+        if (this._icon)
+            place(this._icon, height / 2);
+        if (this._alt) {
+            // Small swipe-down character on top, main one a bit lower
+            const [, , , altH] = this._alt.get_preferred_size();
+            place(this._alt, height * 0.08 + altH / 2);
+            place(this._label, height * 0.6);
+        } else if (this._label) {
+            place(this._label, height / 2);
+        }
     }
 
     // Swipe-down animation: the small top character slides into the middle
@@ -126,12 +146,14 @@ class TabletKeyActor extends St.Widget {
             return;
 
         const altBox = this._alt.get_allocation_box();
+        const labelBox = this._label.get_allocation_box();
         const altCenter = (altBox.y1 + altBox.y2) / 2;
+        const labelCenter = (labelBox.y1 + labelBox.y2) / 2;
         const scale = 1 + (this._altScale - 1) * progress;
 
         this._alt.remove_all_transitions();
         this._label.remove_all_transitions();
-        this._alt.translation_y = (this.height / 2 - altCenter) * progress;
+        this._alt.translation_y = (labelCenter - altCenter) * progress;
         this._alt.set_scale(scale, scale);
         this._alt.opacity = 140 + 115 * progress;
         this._label.translation_y = this.height * 0.35 * progress;
@@ -218,10 +240,12 @@ class TabletKeyGrid extends St.Widget {
         if (this._rows.length === 0)
             return;
 
-        const content = this.get_theme_node().get_content_box(box);
         // Children are positioned relative to our own origin
-        const originX = content.x1 - box.x1;
-        const originY = content.y1 - box.y1;
+        const ownBox = new Clutter.ActorBox();
+        ownBox.set_size(box.get_width(), box.get_height());
+        const content = this.get_theme_node().get_content_box(ownBox);
+        const originX = content.x1;
+        const originY = content.y1;
         const rowHeight = content.get_height() / this._rows.length;
         const unitWidth = content.get_width() / this._units;
         const gapY = Math.round(rowHeight * 0.17);
@@ -257,12 +281,12 @@ class TabletKeyGrid extends St.Widget {
     _applyMetrics(keyHeight) {
         this._metricsSize = keyHeight;
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        // CSS px are scaled by St
         const px = v => Math.max(1, Math.round(v / scale));
         this.metrics = {
             char: px(keyHeight * 0.4),
             fn: px(keyHeight * 0.26),
             alt: px(keyHeight * 0.2),
-            altTop: px(keyHeight * 0.06),
             icon: px(keyHeight * 0.36),
         };
         for (const key of this.keys)
@@ -294,10 +318,14 @@ class TabletKeyGrid extends St.Widget {
 
 // Floating popups live in uiGroup so they can extend above the keyboard.
 const KeyPreview = GObject.registerClass(
-class TabletKeyPreview extends St.Label {
+class TabletKeyPreview extends St.Bin {
     _init() {
         super._init({style_class: 'tk-preview', visible: false});
-        this.clutter_text.x_align = Clutter.ActorAlign.CENTER;
+        this._label = new St.Label({
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this.child = this._label;
         Main.layoutManager.uiGroup.add_child(this);
     }
 
@@ -309,9 +337,8 @@ class TabletKeyPreview extends St.Label {
         const monitor = Main.layoutManager.keyboardMonitor;
         const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
 
-        this.text = text;
-        this.style = `font-size: ${Math.round(kh * 0.55 / scale)}px; ` +
-            `padding-top: ${Math.round(kh * 0.12 / scale)}px;`;
+        this._label.text = text;
+        this._label.style = `font-size: ${Math.round(kh * 0.55 / scale)}px;`;
         this.set_size(width, height);
         this.set_position(
             Math.clamp(Math.round(kx + kw / 2 - width / 2), monitor.x, monitor.x + monitor.width - width),
@@ -349,16 +376,18 @@ class TabletAccentPopup extends St.BoxLayout {
 
         this._items = ordered;
         this._labels = ordered.map(text => {
-            const label = new St.Label({
+            const cell = new St.Bin({
                 style_class: 'tk-accent',
-                text,
-                y_align: Clutter.ActorAlign.CENTER,
-                style: `font-size: ${Math.round(kh * 0.42 / scale)}px;`,
+                child: new St.Label({
+                    text,
+                    x_align: Clutter.ActorAlign.CENTER,
+                    y_align: Clutter.ActorAlign.CENTER,
+                    style: `font-size: ${Math.round(kh * 0.42 / scale)}px;`,
+                }),
             });
-            label.clutter_text.x_align = Clutter.ActorAlign.CENTER;
-            label.set_size(cellWidth, Math.round(kh));
-            this.add_child(label);
-            return label;
+            cell.set_size(cellWidth, Math.round(kh));
+            this.add_child(cell);
+            return cell;
         });
 
         let x = growLeft ? kx + kw - width : kx;
@@ -455,10 +484,16 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     _onDestroy() {
         super._onDestroy();
 
-        Main.uiGroup.remove_action(this._panGesture);
+        // The stock keyboard never removes this
+        if (Main.uiGroup.get_actions().includes(this._panGesture))
+            Main.uiGroup.remove_action(this._panGesture);
         this._cancelAllTouches();
         this._preview?.destroy();
         this._preview = null;
+        if (this._surroundingRetryId) {
+            GLib.source_remove(this._surroundingRetryId);
+            this._surroundingRetryId = 0;
+        }
     }
 
     _syncColorScheme() {
@@ -680,9 +715,19 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (text === null || text === undefined || cursor === null)
             return;
 
+        // Updates racing our own typing may be stale; look again once it pauses
         const now = GLib.get_monotonic_time() / 1000;
-        if (now - this._lastTypeTime < TYPING_QUIET_MS)
+        const quietIn = TYPING_QUIET_MS - (now - this._lastTypeTime);
+        if (quietIn > 0) {
+            if (!this._surroundingRetryId) {
+                this._surroundingRetryId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, quietIn, () => {
+                    this._surroundingRetryId = 0;
+                    this._onSurroundingText();
+                    return GLib.SOURCE_REMOVE;
+                });
+            }
             return;
+        }
 
         const before = [...text].slice(0, cursor).join('');
         if (before === this._lastSurrounding)

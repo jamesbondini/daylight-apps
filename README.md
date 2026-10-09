@@ -46,6 +46,7 @@ cd ~/Projects/daylight-apps && git pull
 | Brave     | Flathub `com.brave.Browser` (user) + `/etc/brave/policies/managed/daylight-apps.json` turning off Rewards, Wallet, VPN, Leo, News and telemetry (Brave Origin has no musl build) | None |
 | Claude Code | Official native installer (`claude.ai/install.sh`, arm64-musl) + `libgcc libstdc++ ripgrep` | Opens `claude` in a terminal to sign in |
 | Maximize New Windows | Bundled GNOME Shell extension (`extensions/maximize-new-windows@finni`), see [dc-1-pmos#10](https://github.com/denysvitali/dc-1-pmos/issues/10) | None; log out and in if it was newly installed |
+| Tablet Keyboard | Bundled GNOME Shell extension (`extensions/tablet-keyboard@finni`) replacing the on-screen keyboard with an iPad-style one; layout follows the GNOME input source, adds an Esc/Tab/Ctrl/arrows row in terminals | None; log out and in if it was newly installed |
 
 ## Adding an app
 
