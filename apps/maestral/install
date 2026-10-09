@@ -1,0 +1,44 @@
+#!/bin/bash
+# Install Maestral into its own Python venv with a systemd user service.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+VENV="$HOME/.local/share/maestral-venv"
+UNIT_DIR="$HOME/.local/share/systemd/user"
+
+step "Creating Python environment in $VENV"
+[ -x "$VENV/bin/python3" ] || python3 -m venv "$VENV" || fail "python3 -m venv failed (is py3-pip installed?)"
+
+step "Installing Maestral from PyPI"
+"$VENV/bin/pip" install --upgrade --progress-bar off --disable-pip-version-check maestral
+
+step "Adding maestral command to ~/.local/bin"
+mkdir -p "$HOME/.local/bin"
+ln -sf "$VENV/bin/maestral" "$HOME/.local/bin/maestral"
+
+step "Installing systemd user service"
+mkdir -p "$UNIT_DIR"
+cat > "$UNIT_DIR/maestral-daemon@.service" <<UNIT
+[Unit]
+Description = Maestral daemon for the config %i
+
+[Service]
+Type = notify
+ExecStart = $VENV/bin/maestral start --foreground --config-name %i
+WatchdogSec = 30
+ExecStop = $VENV/bin/maestral stop --config-name %i
+ExecStopPost = /usr/bin/env bash -c "if [ \${SERVICE_RESULT} != success ]; then notify-send Maestral 'Daemon failed: \${SERVICE_RESULT}'; fi"
+Environment = PYTHONOPTIMIZE=2 LC_CTYPE=UTF-8
+
+[Install]
+WantedBy = default.target
+UNIT
+systemctl --user daemon-reload
+
+if systemctl --user is-enabled --quiet maestral-daemon@maestral.service 2>/dev/null; then
+  step "Restarting daemon"
+  systemctl --user restart maestral-daemon@maestral.service
+  info "Maestral updated."
+else
+  step "Done"
+  info "Next: press “Link Dropbox Account” to sign in and pick a folder."
+fi

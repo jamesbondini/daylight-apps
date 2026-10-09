@@ -1,0 +1,16 @@
+#!/bin/bash
+# Install Tailscale from the Alpine repos and start the daemon.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Installing tailscale (asks for your password)"
+as_root "
+  apk add tailscale tailscale-systemd
+  echo; echo '==> Starting tailscaled'
+  systemctl enable --now tailscaled.service
+  for i in \$(seq 20); do [ -S /run/tailscale/tailscaled.sock ] && break; sleep 0.5; done
+  echo; echo '==> Allowing $USER to manage Tailscale'
+  tailscale set --operator='$USER'
+"
+
+step "Done"
+info "Next: press “Log In” to connect this device to your tailnet."

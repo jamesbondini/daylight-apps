@@ -1,0 +1,13 @@
+#!/bin/bash
+# Disconnect and uninstall Tailscale.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Disconnecting"
+tailscale down 2>/dev/null || true
+
+step "Removing tailscale (asks for your password)"
+as_root "
+  systemctl disable --now tailscaled.service 2>/dev/null || true
+  apk del tailscale tailscale-systemd
+"
+step "Done"

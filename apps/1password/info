@@ -1,0 +1,6 @@
+NAME=1Password
+SUMMARY=Password manager. Installed from Flathub (ARM64 build).
+ICON=com.onepassword.OnePassword dialog-password-symbolic
+WEBSITE=https://1password.com
+OPEN=com.onepassword.OnePassword
+OPEN_LABEL=Open

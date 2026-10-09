@@ -1,0 +1,5 @@
+NAME=Maestral
+SUMMARY=Open-source Dropbox client. Syncs your Dropbox folder in the background.
+ICON=folder-remote-symbolic
+WEBSITE=https://maestral.app
+SETUP_LABEL=Link Dropbox Account

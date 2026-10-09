@@ -1,0 +1,18 @@
+#!/bin/bash
+# Interactive: link a Dropbox account, choose the folder, enable the service.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+require_terminal "$0"
+
+MAESTRAL="$HOME/.local/share/maestral-venv/bin/maestral"
+SERVICE=maestral-daemon@maestral.service
+
+# Let the interactive first run own the config, then hand over to systemd.
+systemctl --user stop "$SERVICE" 2>/dev/null || true
+step "Starting Maestral (follow the prompts to link your account)"
+"$MAESTRAL" start
+"$MAESTRAL" stop >/dev/null
+
+step "Enabling background sync service"
+systemctl --user enable --now "$SERVICE"
+sleep 2
+"$MAESTRAL" status || true

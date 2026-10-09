@@ -1,0 +1,15 @@
+#!/bin/bash
+# Exit 0 if installed; print a one-line status.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+cmd_present tailscale || exit 1
+if ! systemctl is-active --quiet tailscaled.service; then
+  echo "Daemon not running"; exit 0
+fi
+state=$(tailscale status --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("BackendState",""))' 2>/dev/null || true)
+case "$state" in
+  Running)    echo "Connected · $(tailscale ip -4 2>/dev/null | head -1)" ;;
+  NeedsLogin) echo "Not logged in" ;;
+  Stopped)    echo "Disconnected" ;;
+  *)          echo "${state:-Unknown state}" ;;
+esac

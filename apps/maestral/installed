@@ -1,0 +1,12 @@
+#!/bin/bash
+# Exit 0 if installed; print a one-line status.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+VENV="$HOME/.local/share/maestral-venv"
+[ -x "$VENV/bin/maestral" ] || exit 1
+ver=$("$VENV/bin/python3" -c 'import importlib.metadata as m; print(m.version("maestral"))' 2>/dev/null || echo "?")
+state=$(systemctl --user is-active maestral-daemon@maestral.service 2>/dev/null || true)
+case "$state" in
+  active) echo "v$ver · syncing in background" ;;
+  *)      echo "v$ver · daemon not running" ;;
+esac

@@ -1,0 +1,20 @@
+#!/bin/bash
+# Remove Maestral. Keeps ~/.config/maestral and the synced Dropbox folder.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+VENV="$HOME/.local/share/maestral-venv"
+UNIT="$HOME/.local/share/systemd/user/maestral-daemon@.service"
+
+step "Stopping service"
+systemctl --user disable --now maestral-daemon@maestral.service 2>/dev/null || true
+rm -f "$UNIT"
+systemctl --user daemon-reload
+
+step "Removing program files"
+if [ "$(readlink "$HOME/.local/bin/maestral" 2>/dev/null)" = "$VENV/bin/maestral" ]; then
+  rm -f "$HOME/.local/bin/maestral"
+fi
+rm -rf "$VENV"
+
+step "Done"
+info "Kept your settings (~/.config/maestral) and your Dropbox folder."

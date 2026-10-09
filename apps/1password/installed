@@ -1,0 +1,8 @@
+#!/bin/bash
+# Exit 0 if installed; print a one-line status.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+APP=com.onepassword.OnePassword
+flatpak_present "$APP" || exit 1
+ver=$(flatpak info "$APP" 2>/dev/null | awk -F': *' '/Version:/ {print $2; exit}')
+echo "v${ver:-?} · Flatpak"

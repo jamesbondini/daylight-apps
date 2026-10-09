@@ -1,0 +1,9 @@
+#!/bin/bash
+# Log in / connect. Prints a login URL the GUI turns into a button.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Connecting to Tailscale"
+info "If a login link appears, open it and sign in. This waits until you do."
+tailscale up --accept-routes
+step "Connected"
+tailscale status | head -20
