@@ -17,6 +17,7 @@ import * as InputSourceManager from 'resource:///org/gnome/shell/ui/status/keybo
 
 import {findCorrection} from './autocorrect.js';
 import {buildPages} from './layouts.js';
+import {Dictation} from './voice.js';
 
 const LONG_PRESS_MS = 450;
 const TRACKPAD_PRESS_MS = 400;
@@ -29,6 +30,8 @@ const DOUBLE_SPACE_MS = 1200;
 const TYPING_QUIET_MS = 400;
 const FLICK_START_PX = 10;
 const RESET_MS = 140;
+// Holding the mic key longer than this is push-to-talk, shorter toggles
+const VOICE_HOLD_MS = 350;
 
 const TERMINAL_WM_CLASS = /ghostty|terminal|kgx|console|alacritty|kitty|foot|wezterm|konsole|xterm/i;
 const {InputContentPurpose: Purpose, InputContentHintFlags: Hint} = Clutter;
@@ -528,6 +531,11 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
         this._preview = new KeyPreview();
 
+        this._dictation = new Dictation({
+            onChanged: () => this._syncVoice(),
+            onText: text => this._typeDictation(text),
+        });
+
         Main.inputMethod.connectObject('surrounding-text-set',
             this._onSurroundingText.bind(this), this);
     }
@@ -541,6 +549,8 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._cancelAllTouches();
         this._preview?.destroy();
         this._preview = null;
+        this._dictation?.destroy();
+        this._dictation = null;
         if (this._surroundingRetryId) {
             GLib.source_remove(this._surroundingRetryId);
             this._surroundingRetryId = 0;
@@ -587,7 +597,9 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._pages = buildPages(group, Object.keys(sources).length > 1, {
             split: this._splitActive,
             alts: this._settings.get_boolean('swipe-symbols'),
+            voice: this._dictation.available,
         });
+        this._voiceShown = this._dictation.available;
     }
 
     // Rebuilds the keys after a settings change, staying on the same page
@@ -690,6 +702,8 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
     _animateHide() {
         this._cancelAllTouches();
+        // Text must not land wherever the focus goes next
+        this._dictation?.cancel();
         super._animateHide();
     }
 
@@ -713,6 +727,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
                 key.applyMetrics(this._grid.metrics);
         }
         this._syncShiftKeys();
+        this._syncVoiceKeys();
         this._updateAutoShift();
     }
 
@@ -1456,6 +1471,9 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
                 return GLib.SOURCE_REMOVE;
             });
             break;
+        case 'voice':
+            this._voiceDown(touch);
+            break;
         case 'page': {
             // Switch on press so a finger can slide onto a symbol and release
             const fromLetters = this._pageName === 'letters';
@@ -1666,12 +1684,71 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         case 'emoji':
             this._toggleEmoji();
             break;
+        case 'voice':
+            this._voiceUp(touch);
+            break;
         case 'globe':
             this._switchInputSource();
             break;
         case 'hide':
             this.close(true);
             break;
+        }
+    }
+
+    // --- Voice typing ----------------------------------------------------
+
+    // Press starts recording; releasing after a hold stops it (push-to-talk),
+    // after a tap leaves it running until the next tap.
+    _voiceDown(touch) {
+        const dictation = this._dictation;
+        if (dictation.state === 'idle') {
+            dictation.start();
+            touch.voiceStarted = GLib.get_monotonic_time() / 1000;
+        } else if (dictation.state === 'recording') {
+            dictation.stop();
+        }
+    }
+
+    _voiceUp(touch) {
+        const held = GLib.get_monotonic_time() / 1000 - (touch.voiceStarted ?? Infinity);
+        if (held >= VOICE_HOLD_MS)
+            this._dictation.stop();
+    }
+
+    _typeDictation(text) {
+        // Separate from the word before the cursor
+        const before = this._history;
+        if (before && !/\s$/.test(before))
+            text = ` ${text}`;
+        this._lastCorrection = null;
+        this._commit(text);
+        this._lastSpaceTime = 0;
+        this._updateAutoShift();
+    }
+
+    _syncVoice() {
+        if (!this._dictation)
+            return;
+        // Installing or removing the helper adds or removes the key
+        if (this._pages && this._voiceShown !== this._dictation.available)
+            this._rebuildPages();
+        this._syncVoiceKeys();
+    }
+
+    _syncVoiceKeys() {
+        const state = this._dictation?.state ?? 'idle';
+        for (const key of this._grid.keys) {
+            if (key.spec.kind !== 'voice')
+                continue;
+            for (const s of ['recording', 'transcribing']) {
+                if (state === s)
+                    key.add_style_class_name(`tk-${s}`);
+                else
+                    key.remove_style_class_name(`tk-${s}`);
+            }
+            key.setIcon(state === 'transcribing'
+                ? 'content-loading-symbolic' : 'audio-input-microphone-symbolic');
         }
     }
 

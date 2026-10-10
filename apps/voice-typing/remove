@@ -1,0 +1,15 @@
+#!/bin/bash
+# Remove the dictate helper, the model and whisper.cpp.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+DEST="$HOME/.local/share/daylight-apps/voice-typing"
+step "Removing the helper and model"
+# Helper first, so the keyboard hides its microphone key straight away
+rm -f "$DEST/dictate"
+rm -rf "$DEST"
+
+if apk_present whisper.cpp; then
+  step "Removing whisper.cpp (asks for your password)"
+  as_root "$(apk_del_cmd whisper.cpp)"
+fi
+step "Done"

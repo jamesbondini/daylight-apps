@@ -188,3 +188,17 @@
 .tk-shortcut-icon {
   icon-size: 20px;
 }
+
+/* Voice typing: red while recording, dimmed while transcribing */
+.tk-key.tk-voice.tk-recording,
+.tk-dark .tk-key.tk-voice.tk-recording {
+  background-color: #ff3b30;
+}
+
+.tk-key.tk-voice.tk-recording .tk-icon {
+  color: #ffffff;
+}
+
+.tk-key.tk-voice.tk-transcribing .tk-icon {
+  color: #8a8a8e;
+}

@@ -1,0 +1,13 @@
+#!/bin/bash
+# Exit 0 if installed; print a one-line status.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+DEST="$HOME/.local/share/daylight-apps/voice-typing"
+[ -x "$DEST/dictate" ] || exit 1
+if ! cmd_present whisper-cli; then
+  echo "whisper.cpp missing, press Update"
+elif ! gnome_ext_enabled tablet-keyboard@finni; then
+  echo "Install Tablet Keyboard for the microphone key"
+else
+  echo "Ready · base.en model"
+fi

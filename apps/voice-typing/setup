@@ -1,0 +1,10 @@
+#!/bin/bash
+# Try voice typing in a terminal.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+require_terminal "$0"
+
+DICTATE="$HOME/.local/share/daylight-apps/voice-typing/dictate"
+echo "Say something, then press Enter."
+text=$("$DICTATE")
+echo
+echo "Heard: ${text:-(nothing)}"

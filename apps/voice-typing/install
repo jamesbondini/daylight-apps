@@ -1,0 +1,30 @@
+#!/bin/bash
+# Install whisper.cpp, download the base.en model and set up the dictate
+# helper that Tablet Keyboard's microphone key uses.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+HERE="$(dirname "$(readlink -f "$0")")"
+DEST="$HOME/.local/share/daylight-apps/voice-typing"
+MODEL=ggml-base.en.bin
+URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$MODEL"
+
+if ! apk_present whisper.cpp; then
+  step "Installing whisper.cpp (asks for your password)"
+  as_root "$(apk_add_cmd whisper.cpp)"
+fi
+cmd_present pw-record || fail "pw-record is missing (part of pipewire-tools)"
+
+mkdir -p "$DEST"
+if [ ! -s "$DEST/$MODEL" ]; then
+  step "Downloading the Whisper base.en model (142 MB)"
+  curl -fL --progress-bar -o "$DEST/$MODEL.part" "$URL"
+  mv "$DEST/$MODEL.part" "$DEST/$MODEL"
+fi
+
+# Copied last: the keyboard shows its microphone key once this exists
+step "Installing the dictate helper"
+install -m 755 "$HERE/dictate" "$DEST/dictate"
+
+step "Done"
+info "Tablet Keyboard now has a microphone key next to the emoji key:"
+info "hold it while you speak, or tap to start and tap again to stop."

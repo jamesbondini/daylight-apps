@@ -1,0 +1,34 @@
+#!/bin/bash
+# Record from the default microphone until a line or end of input arrives on
+# stdin, then print the transcription. Tablet Keyboard's microphone key runs
+# this and types the output; SIGTERM cancels without output.
+set -u
+
+DIR="$(dirname "$(readlink -f "$0")")"
+MODEL="$DIR/ggml-base.en.bin"
+TMP="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/dictate-XXXXXX")"
+WAV="$TMP/speech.wav"
+rec= job=
+
+# Never "kill 0": that would signal the caller's whole process group
+trap 'kill $rec $job 2>/dev/null; exit 143' TERM INT
+trap 'rm -rf "$TMP"' EXIT
+
+pw-record --rate 16000 --channels 1 --format s16 "$WAV" &
+rec=$!
+
+# Background jobs, so the TERM trap runs straight away
+head -n 1 <&0 >/dev/null &
+job=$!
+wait "$job"
+
+kill -INT "$rec" 2>/dev/null
+wait "$rec"
+rec=
+
+whisper-cli -m "$MODEL" -f "$WAV" -l en -t 4 -nt -np 2>/dev/null >"$TMP/text" &
+job=$!
+wait "$job" || exit 1
+
+# One line, without non-speech tags like [BLANK_AUDIO] or (wind blowing)
+sed -E 's/\[[^]]*\]//g; s/\([^)]*\)//g' "$TMP/text" | tr -s ' \n' ' ' | sed -E 's/^ +| +$//g'

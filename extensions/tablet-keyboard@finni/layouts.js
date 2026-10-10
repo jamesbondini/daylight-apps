@@ -86,11 +86,13 @@ function charKey(text, alt = null, accents = null) {
     };
 }
 
-function bottomRow(units, page, label, multiSource) {
+function bottomRow(units, page, label, {multiSource, voice}) {
     const side = [];
     if (multiSource)
         side.push({kind: 'globe', icon: 'osk-layout-symbolic', width: 1.1});
     side.push({kind: 'emoji', icon: 'osk-emoji-picker-symbolic', width: 1.1});
+    if (voice)
+        side.push({kind: 'voice', icon: 'audio-input-microphone-symbolic', width: 1.1});
     const pageKey = {kind: 'page', page, label, width: 1.5};
     const hide = {kind: 'hide', icon: 'osk-hide-symbolic', width: 1.1};
     const used = side.reduce((sum, k) => sum + k.width, 0) + 2 * pageKey.width + hide.width;
@@ -116,7 +118,7 @@ function shiftKey(width) {
     return {kind: 'shift', icon: 'osk-shift-symbolic', width};
 }
 
-function lettersPage(group, multiSource) {
+function lettersPage(group, opts) {
     const [r1, r2, r3] = letterRows(group);
     const units = Math.max(r1.length + 1.4, r2.length + 1.9, r3.length + 4.4);
     const indent = Math.max(0, Math.min(0.5, units - r2.length - 1.4));
@@ -140,12 +142,12 @@ function lettersPage(group, multiSource) {
                 charKey('.', '?'),
                 shiftKey(shiftWidth),
             ],
-            bottomRow(units, 'numbers', '.?123', multiSource),
+            bottomRow(units, 'numbers', '.?123', opts),
         ],
     };
 }
 
-function symbolPage(rows, alts, otherPage, otherLabel, multiSource) {
+function symbolPage(rows, alts, otherPage, otherLabel, opts) {
     const units = 11.4;
     const chars = (row, rowAlts = []) =>
         [...row].map((c, i) => charKey(c, rowAlts[i] ?? null));
@@ -157,7 +159,7 @@ function symbolPage(rows, alts, otherPage, otherLabel, multiSource) {
             [...chars(rows[0], alts[0]), deleteKey(units - 10)],
             [{kind: 'gap', width: 0.5}, ...chars(rows[1], alts[1]), returnKey(units - 9.5)],
             [pageKey, ...chars(rows[2], alts[2]), {...pageKey}],
-            bottomRow(units, 'letters', 'ABC', multiSource),
+            bottomRow(units, 'letters', 'ABC', opts),
         ],
     };
 }
@@ -192,8 +194,8 @@ function withoutAlts(page) {
     };
 }
 
-export function buildPages(group, multiSource, {split = false, alts = true} = {}) {
-    const pages = basePages(group, multiSource);
+export function buildPages(group, multiSource, {split = false, alts = true, voice = false} = {}) {
+    const pages = basePages(group, {multiSource, voice});
     for (const name of Object.keys(pages)) {
         if (!alts)
             pages[name] = withoutAlts(pages[name]);
@@ -203,9 +205,9 @@ export function buildPages(group, multiSource, {split = false, alts = true} = {}
     return pages;
 }
 
-function basePages(group, multiSource) {
+function basePages(group, opts) {
     return {
-        letters: lettersPage(group, multiSource),
+        letters: lettersPage(group, opts),
         numbers: symbolPage(
             ['1234567890', '@#$&*()\'"', '%-+=/;:,.'],
             [
@@ -213,10 +215,10 @@ function basePages(group, multiSource) {
                 [...'_\\|~<>€£¥'],
                 [null, null, null, null, null, null, null, '!', '?'],
             ],
-            'symbols', '#+=', multiSource),
+            'symbols', '#+=', opts),
         symbols: symbolPage(
             ['[]{}#%^*+=', '_\\|~<>€£¥', '§•°.,?!\'"'],
             [[], [], []],
-            'numbers', '123', multiSource),
+            'numbers', '123', opts),
     };
 }
