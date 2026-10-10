@@ -41,9 +41,10 @@
         <choice value="system"/>
         <choice value="light"/>
         <choice value="dark"/>
+        <choice value="mono"/>
       </choices>
-      <default>'system'</default>
-      <summary>Light or dark keys</summary>
+      <default>'mono'</default>
+      <summary>Key colors: mono is high contrast black and white, for monochrome screens</summary>
     </key>
     <key name="voice-engine" type="s">
       <choices>

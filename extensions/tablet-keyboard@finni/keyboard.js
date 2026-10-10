@@ -61,6 +61,11 @@ function centerPivot() {
 const VOICE_BARS = [0.45, 0.75, 1, 0.75, 0.45];
 const VOICE_LEVEL_MS = 60;
 
+// Color schemes besides light, which has no class
+const THEME_CLASSES = ['tk-dark', 'tk-mono'];
+// Behind the keyboard, matching #keyboard in the stylesheet
+const PANEL_COLORS = {light: '#d1d3d9', dark: '#2b2b2d', mono: '#ffffff'};
+
 // Bars inside the mic key: they follow the microphone while recording and
 // run a wave while transcribing
 const VoiceMeter = GObject.registerClass(
@@ -483,7 +488,7 @@ class TabletKeyPreview extends St.Bin {
         Main.layoutManager.uiGroup.add_child(this);
     }
 
-    showFor(key, text, dark) {
+    showFor(key, text, theme) {
         const [kx, ky] = key.get_transformed_position();
         const [kw, kh] = key.get_transformed_size();
         const width = Math.round(kw * 1.3);
@@ -497,25 +502,25 @@ class TabletKeyPreview extends St.Bin {
         this.set_position(
             Math.clamp(Math.round(kx + kw / 2 - width / 2), monitor.x, monitor.x + monitor.width - width),
             Math.round(ky - height - kh * 0.1));
-        this._setDark(dark);
+        this._setTheme(theme);
         Main.layoutManager.uiGroup.set_child_above_sibling(this, null);
         this.show();
     }
 
-    _setDark(dark) {
-        if (dark)
-            this.add_style_class_name('tk-dark');
-        else
-            this.remove_style_class_name('tk-dark');
+    _setTheme(theme) {
+        for (const name of THEME_CLASSES)
+            this.remove_style_class_name(name);
+        if (theme)
+            this.add_style_class_name(theme);
     }
 });
 
 const AccentPopup = GObject.registerClass(
 class TabletAccentPopup extends St.BoxLayout {
-    _init(key, items, dark, {widthScale = 1, fontScale = 0.42} = {}) {
+    _init(key, items, theme, {widthScale = 1, fontScale = 0.42} = {}) {
         super._init({style_class: 'tk-accents'});
-        if (dark)
-            this.add_style_class_name('tk-dark');
+        if (theme)
+            this.add_style_class_name(theme);
 
         const [kx, ky] = key.get_transformed_position();
         const [kw, kh] = key.get_transformed_size();
@@ -682,21 +687,21 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     }
 
     _syncColorScheme() {
-        const scheme = this._settings.get_string('color-scheme');
-        this._dark = scheme === 'system'
-            ? this._interfaceSettings.get_string('color-scheme') === 'prefer-dark'
-            : scheme === 'dark';
-        if (this._dark) {
-            this.add_style_class_name('tk-dark');
+        let scheme = this._settings.get_string('color-scheme');
+        if (scheme === 'system')
+            scheme = this._interfaceSettings.get_string('color-scheme') === 'prefer-dark' ? 'dark' : 'light';
+        // Style class for the keyboard and its popups, null for light
+        this._theme = scheme === 'light' ? null : `tk-${scheme}`;
+        for (const name of THEME_CLASSES)
+            this.remove_style_class_name(name);
+        if (this._theme)
+            this.add_style_class_name(this._theme);
+        if (scheme === 'dark')
             this._bottomPanelBox?.add_style_class_name('dark-mode-enabled');
-        } else {
-            this.remove_style_class_name('tk-dark');
+        else
             this._bottomPanelBox?.remove_style_class_name('dark-mode-enabled');
-        }
-        if (this._bottomPanelBox) {
-            this._bottomPanelBox.style = this._dark
-                ? 'background-color: #2b2b2d;' : 'background-color: #d1d3d9;';
-        }
+        if (this._bottomPanelBox)
+            this._bottomPanelBox.style = `background-color: ${PANEL_COLORS[scheme]};`;
     }
 
     // --- Parent overrides ------------------------------------------------
@@ -1453,7 +1458,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         touch.menu = this._isLandscape()
             ? [split ? 'Merge' : 'Split', 'Settings'] : ['Settings'];
         touch.mode = 'menu';
-        touch.accents = new AccentPopup(touch.key, touch.menu, this._dark,
+        touch.accents = new AccentPopup(touch.key, touch.menu, this._theme,
             {widthScale: 2.4, fontScale: 0.26});
     }
 
@@ -1579,7 +1584,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
         switch (key.spec.kind) {
         case 'char':
-            this._preview.showFor(key, key.text, this._dark);
+            this._preview.showFor(key, key.text, this._theme);
             if (key.accents.length > 0) {
                 touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, LONG_PRESS_MS, () => {
                     touch.timer = 0;
@@ -1697,7 +1702,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         touch.y0 = touch.y;
         under.add_style_pseudo_class('active');
         if (under.spec.kind === 'char') {
-            this._preview.showFor(under, under.text, this._dark);
+            this._preview.showFor(under, under.text, this._theme);
             if (under.accents.length > 0 && !touch.slide) {
                 touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, LONG_PRESS_MS, () => {
                     touch.timer = 0;
@@ -1713,7 +1718,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     _openAccents(touch) {
         this._preview.hide();
         touch.mode = 'accents';
-        touch.accents = new AccentPopup(touch.key, touch.key.accents, this._dark);
+        touch.accents = new AccentPopup(touch.key, touch.key.accents, this._theme);
     }
 
     _startTrackpad(touch) {

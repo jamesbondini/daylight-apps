@@ -5,7 +5,7 @@ import Gtk from 'gi://Gtk';
 
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-const SCHEMES = ['system', 'light', 'dark'];
+const SCHEMES = ['mono', 'system', 'light', 'dark'];
 const ENGINES = ['whisper', 'parakeet'];
 // Installed by the Daylight Apps "Voice Typing" app
 const VOICE_HELPER = GLib.build_filenamev(
@@ -40,8 +40,9 @@ export default class TabletKeyboardPreferences extends ExtensionPreferences {
             'Undo, redo and paste above the keys, plus cut and copy when text is selected');
 
         const scheme = new Adw.ComboRow({
-            title: 'Colors',
-            model: Gtk.StringList.new(['Follow system', 'Light', 'Dark']),
+            title: 'Theme',
+            subtitle: 'Monochrome is black and white with high contrast, for the Daylight screen',
+            model: Gtk.StringList.new(['Monochrome', 'Follow system', 'Light', 'Dark']),
             selected: Math.max(0, SCHEMES.indexOf(settings.get_string('color-scheme'))),
         });
         scheme.connect('notify::selected',

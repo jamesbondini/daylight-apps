@@ -1,5 +1,6 @@
-/* iPad-style light and dark keyboard. Sizes of labels and icons are set from
- * code, relative to the key size. */
+/* iPad-style light and dark keyboard, plus a black and white one for
+ * monochrome screens. Sizes of labels and icons are set from code,
+ * relative to the key size. */
 
 #keyboard.tk-keyboard {
   background-color: #d1d3d9;
@@ -207,4 +208,79 @@
 
 .tk-key.tk-voice.tk-downloading .tk-icon {
   color: #8a8a8e;
+}
+
+/* Monochrome: outlined keys, no shadows, and black with white text for
+ * anything pressed, latched or active */
+#keyboard.tk-keyboard.tk-mono {
+  background-color: #ffffff;
+}
+
+.tk-mono .tk-key {
+  color: #000000;
+  border: 2px solid #000000;
+  box-shadow: none;
+}
+
+.tk-mono .tk-key.tk-char {
+  background-color: #ffffff;
+  box-shadow: none;
+}
+
+.tk-mono .tk-key.tk-fn {
+  background-color: #cccccc;
+  box-shadow: none;
+}
+
+.tk-mono .tk-key:active,
+.tk-mono .tk-key.tk-char:active,
+.tk-mono .tk-key.tk-fn:active,
+.tk-mono .tk-key.tk-latched,
+.tk-mono .tk-key.tk-voice.tk-recording {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.tk-mono .tk-key:active .tk-icon,
+.tk-mono .tk-key:active .tk-alt,
+.tk-mono .tk-key.tk-latched .tk-icon {
+  color: #ffffff;
+}
+
+.tk-mono .tk-alt {
+  color: #555555;
+}
+
+.tk-mono .tk-key.tk-voice.tk-downloading .tk-icon {
+  color: #555555;
+}
+
+.tk-mono .tk-trackpad .tk-key,
+.tk-mono .tk-trackpad .tk-key:active {
+  background-color: #eeeeee;
+  border-color: #999999;
+}
+
+.tk-mono .tk-tool {
+  color: #000000;
+}
+
+.tk-mono .tk-tool:active,
+.tk-mono .tk-tool:checked,
+.tk-mono .tk-tool.tk-locked {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.tk-preview.tk-mono,
+.tk-accents.tk-mono {
+  background-color: #ffffff;
+  color: #000000;
+  border: 2px solid #000000;
+  box-shadow: none;
+}
+
+.tk-accents.tk-mono .tk-accent:selected {
+  background-color: #000000;
+  color: #ffffff;
 }
