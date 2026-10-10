@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.airpods"
+          path="/org/gnome/shell/extensions/airpods/">
+    <key name="pause-media" type="s">
+      <choices>
+        <choice value="one"/>
+        <choice value="both"/>
+        <choice value="never"/>
+      </choices>
+      <default>'one'</default>
+      <summary>Pause media when one earbud ("one") or both ("both") come out, or "never"</summary>
+    </key>
+    <key name="adaptive-level" type="i">
+      <range min="0" max="100"/>
+      <default>50</default>
+      <summary>Last Adaptive noise level set; the AirPods do not report it back</summary>
+    </key>
+  </schema>
+</schemalist>

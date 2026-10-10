@@ -1,51 +1,39 @@
 #!/bin/bash
-# Build the librepods AirPods daemon from omarchy-pods (pinned commit), run it
-# as a systemd user service, and install the bundled Quick Settings extension
-# that reads its status file.
+# Install and enable the bundled AirPods GNOME Shell extension. It talks to
+# the AirPods itself through BlueZ, so there is nothing else to build or run.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-REPO=https://github.com/MB-JAMBON/omarchy-pods.git
-REV=3d770f31fc051e9da86d8dcdd2b62cc76de29112
-DATA="$HOME/.local/share/daylight-apps/airpods"
-SRC="$DATA/omarchy-pods"
-BUILD="$DATA/build"
 UUID=airpods@finni
-EXT_SRC="$(dirname "$(readlink -f "$0")")/../../extensions/$UUID"
-EXT_DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
-# Grouped under one virtual package so Remove takes exactly these away again
-DEPS="build-base cmake samurai pkgconf git qt6-qtbase-dev qt6-qtdeclarative-dev qt6-qtconnectivity-dev qt6-qttools-dev openssl-dev pulseaudio-dev"
+SRC="$(dirname "$(readlink -f "$0")")/../../extensions/$UUID"
+DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
 
-if ! apk_present .daylight-airpods $DEPS; then
-  step "Installing build tools and Qt (asks for your password)"
-  as_root "apk add -t .daylight-airpods $DEPS || true
-for p in $DEPS; do apk info -e \"\$p\" >/dev/null || { echo \"Package \$p did not install\" >&2; exit 1; }; done"
+# Earlier versions ran the librepods daemon, which would fight the extension
+# over the AirPods' control channel
+OLD="$HOME/.local/share/daylight-apps/airpods"
+if [ -e "$HOME/.local/share/systemd/user/librepods.service" ] || [ -d "$OLD" ]; then
+  step "Removing the librepods daemon from an earlier version"
+  systemctl --user disable --now --quiet librepods.service 2>/dev/null || true
+  if [ -f "$OLD/build/install_manifest.txt" ]; then
+    # BusyBox xargs has no -d
+    tr '\n' '\0' < "$OLD/build/install_manifest.txt" | xargs -0 -r rm -f
+  fi
+  rm -f "$HOME/.local/bin/librepods" "$HOME/.local/bin/librepods-ctl" \
+    "$HOME/.local/share/systemd/user/librepods.service"
+  systemctl --user daemon-reload
+  rm -rf "$OLD"
+fi
+if apk_present .daylight-airpods; then
+  step "Removing its build tools and Qt (asks for your password)"
+  as_root "$(apk_del_cmd .daylight-airpods)"
 fi
 
-step "Downloading omarchy-pods"
-mkdir -p "$DATA"
-[ -d "$SRC/.git" ] || git clone --quiet "$REPO" "$SRC"
-# Fetch only when the pinned commit is missing, so Update also works offline
-git -C "$SRC" cat-file -e "$REV^{commit}" 2>/dev/null || git -C "$SRC" fetch --quiet origin
-git -C "$SRC" checkout --quiet --force "$REV"
+step "Copying extension to $DEST"
+rm -rf "$DEST"
+mkdir -p "$DEST"
+cp -r "$SRC"/. "$DEST"/
+glib-compile-schemas "$DEST/schemas"
 
-step "Building the librepods daemon (takes a few minutes)"
-cmake -S "$SRC/daemon" -B "$BUILD" -G Ninja -DBUILD_TESTING=OFF \
-  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/.local" >/dev/null
-cmake --build "$BUILD"
-cmake --install "$BUILD" >/dev/null
-# The daemon runs headless here; its own window would only duplicate the extension
-rm -f "$HOME/.local/share/applications/me.kavishdevar.librepods.desktop"
-
-step "Starting the daemon"
-systemctl --user daemon-reload
-systemctl --user enable --quiet librepods.service
-# restart rather than enable --now, so an update replaces a running old binary
-systemctl --user restart librepods.service
-
-step "Installing the Quick Settings extension"
-rm -rf "$EXT_DEST"
-mkdir -p "$EXT_DEST"
-cp -r "$EXT_SRC"/. "$EXT_DEST"/
+step "Enabling extension"
 gnome_ext_set_enabled "$UUID" true
 
 step "Done"

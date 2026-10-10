@@ -2,27 +2,33 @@
 # Exit 0 if installed; print a one-line status.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-[ -x "$HOME/.local/bin/librepods" ] || exit 1
-[ -f "$HOME/.local/share/gnome-shell/extensions/airpods@finni/extension.js" ] || exit 1
+UUID=airpods@finni
+[ -f "$HOME/.local/share/gnome-shell/extensions/$UUID/extension.js" ] || exit 1
 
-if ! systemctl --user is-active --quiet librepods.service; then
-  echo "Daemon not running"
-  exit 0
+state=$(gnome-extensions info "$UUID" 2>/dev/null | awk -F': ' '/State:/ {print $2}' || true)
+case "$state" in
+  ACTIVE) ;;
+  INACTIVE|DISABLED) echo "Disabled"; exit 0 ;;
+  *) echo "Log out and back in to activate"; exit 0 ;;
+esac
+
+# Paired devices offering Apple's AirPods control service
+name="" connected=no
+while read -r _ mac _; do
+  details=$(bluetoothctl info "$mac" 2>/dev/null) || continue
+  grep -qi 74ec2172-0bad-4d01-8f77-997b2be0722a <<<"$details" || continue
+  this=$(awk -F': ' '/^[ \t]*Alias:/ {print $2; exit}' <<<"$details")
+  if grep -q "Connected: yes" <<<"$details"; then
+    name=$this connected=yes
+    break
+  fi
+  name=${name:-$this}
+done < <(bluetoothctl devices Paired 2>/dev/null || true)
+
+if [ -z "$name" ]; then
+  echo "Active · no AirPods paired"
+elif [ "$connected" = yes ]; then
+  echo "$name connected"
+else
+  echo "$name · not connected"
 fi
-python3 - "${XDG_STATE_HOME:-$HOME/.local/state}/librepods/status.json" <<'PY'
-import json, sys
-try:
-    s = json.load(open(sys.argv[1]))
-except Exception:
-    print("Running · no AirPods seen yet"); sys.exit()
-name = s.get("device_name") or s.get("model_name") or "AirPods"
-if not s.get("connected"):
-    print(f"{name} · not connected"); sys.exit()
-parts = []
-for key, label in (("left", "L"), ("right", "R"), ("case", "Case"), ("headset", "")):
-    b = s.get(key) or {}
-    level = b.get("level")
-    if b.get("available") and isinstance(level, int) and level >= 0:
-        parts.append(f"{label} {level}%".strip())
-print(" · ".join([f"{name} connected"] + parts))
-PY

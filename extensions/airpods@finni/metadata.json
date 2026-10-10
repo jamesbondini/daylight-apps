@@ -1,6 +1,7 @@
 {
   "uuid": "airpods@finni",
   "name": "AirPods",
-  "description": "AirPods battery, listening mode, Conversation Awareness and ear detection in Quick Settings. Reads the librepods daemon from omarchy-pods.",
+  "description": "AirPods battery, listening mode, Conversation Awareness and ear detection in Quick Settings. Talks to the AirPods directly over Bluetooth through BlueZ.",
+  "settings-schema": "org.gnome.shell.extensions.airpods",
   "shell-version": ["48"]
 }

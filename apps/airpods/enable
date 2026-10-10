@@ -1,9 +1,12 @@
 #!/bin/bash
-# Start the daemon and turn the extension on.
+# Turn the extension on.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-step "Starting the daemon"
-systemctl --user enable --now --quiet librepods.service
+UUID=airpods@finni
 step "Enabling extension"
-gnome_ext_set_enabled airpods@finni true
-info "On."
+gnome_ext_set_enabled "$UUID" true
+if gnome-extensions info "$UUID" 2>/dev/null | grep -q "State: ACTIVE"; then
+  info "On."
+else
+  info "Log out and back in to activate it."
+fi
