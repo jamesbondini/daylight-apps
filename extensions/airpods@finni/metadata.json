@@ -1,0 +1,6 @@
+{
+  "uuid": "airpods@finni",
+  "name": "AirPods",
+  "description": "AirPods battery, listening mode, Conversation Awareness and ear detection in Quick Settings. Reads the librepods daemon from omarchy-pods.",
+  "shell-version": ["48"]
+}

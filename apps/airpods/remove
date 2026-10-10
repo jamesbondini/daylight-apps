@@ -1,0 +1,29 @@
+#!/bin/bash
+# Stop and remove the librepods daemon, the extension and the build tools.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+UUID=airpods@finni
+DATA="$HOME/.local/share/daylight-apps/airpods"
+
+step "Removing the extension"
+gnome_ext_set_enabled "$UUID" false
+rm -rf "$HOME/.local/share/gnome-shell/extensions/$UUID"
+
+step "Stopping the daemon"
+systemctl --user disable --now --quiet librepods.service 2>/dev/null || true
+
+step "Removing files"
+if [ -f "$DATA/build/install_manifest.txt" ]; then
+  xargs -d '\n' rm -f < "$DATA/build/install_manifest.txt"
+fi
+rm -f "$HOME/.local/bin/librepods" "$HOME/.local/bin/librepods-ctl" \
+  "$HOME/.local/share/systemd/user/librepods.service"
+systemctl --user daemon-reload
+rm -rf "$DATA"
+info "Kept ~/.config/AirPodsTrayApp (pairing keys and settings)."
+
+if apk_present .daylight-airpods; then
+  step "Removing build tools and Qt (asks for your password)"
+  as_root "apk del .daylight-airpods || true"
+fi
+step "Done"

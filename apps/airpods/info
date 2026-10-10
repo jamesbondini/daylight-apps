@@ -1,0 +1,5 @@
+NAME=AirPods
+SUMMARY=Battery for each AirPod and the case, listening modes, Conversation Awareness and ear detection in Quick Settings. Builds the librepods daemon from omarchy-pods.
+ICON=audio-headphones-symbolic
+WEBSITE=https://github.com/MB-JAMBON/omarchy-pods
+SETUP_LABEL=Pair AirPods

@@ -1,0 +1,27 @@
+#!/bin/bash
+# Exit 0 if installed; print a one-line status.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+[ -x "$HOME/.local/bin/librepods" ] || exit 1
+[ -f "$HOME/.local/share/gnome-shell/extensions/airpods@finni/extension.js" ] || exit 1
+
+if ! systemctl --user is-active --quiet librepods.service; then
+  echo "Daemon not running"
+  exit 0
+fi
+python3 - "${XDG_STATE_HOME:-$HOME/.local/state}/librepods/status.json" <<'PY'
+import json, sys
+try:
+    s = json.load(open(sys.argv[1]))
+except Exception:
+    print("Running · no AirPods seen yet"); sys.exit()
+name = s.get("device_name") or s.get("model_name") or "AirPods"
+if not s.get("connected"):
+    print(f"{name} · not connected"); sys.exit()
+parts = []
+for key, label in (("left", "L"), ("right", "R"), ("case", "Case"), ("headset", "")):
+    b = s.get(key) or {}
+    if b.get("available") and b.get("level", -1) >= 0:
+        parts.append(f"{label} {b['level']}%".strip())
+print(" · ".join([f"{name} connected"] + parts))
+PY

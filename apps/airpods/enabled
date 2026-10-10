@@ -1,0 +1,4 @@
+#!/bin/bash
+# Exit 0 if the daemon and the extension are turned on.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+systemctl --user is-enabled --quiet librepods.service && gnome_ext_enabled airpods@finni

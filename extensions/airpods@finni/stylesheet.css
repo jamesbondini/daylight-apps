@@ -1,0 +1,5 @@
+.airpods-battery-box { spacing: 12px; padding: 6px 0; }
+.airpods-battery-level { font-size: 1.4em; font-weight: bold; }
+.airpods-battery-caption { font-size: 0.85em; color: rgba(255, 255, 255, 0.6); }
+.airpods-battery-low { color: #ff7b63; }
+.airpods-slider-item { spacing: 12px; }
