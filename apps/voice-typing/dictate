@@ -46,7 +46,10 @@ ENGINE="${1:-whisper}"
 MODEL="$MODELS/$(model_file "$ENGINE")" || exit 2
 [ -s "$MODEL" ] || { echo "model missing: $MODEL" >&2; exit 3; }
 
-TMP="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/dictate-XXXXXX")"
+# Tablet Keyboard reads the recording's loudness from here, by our pid
+TMP="${XDG_RUNTIME_DIR:-/tmp}/dictate-$$"
+rm -rf "$TMP"
+mkdir -m 700 "$TMP" || exit 1
 WAV="$TMP/speech.wav"
 rec= job=
 

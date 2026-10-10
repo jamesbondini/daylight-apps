@@ -19,6 +19,13 @@ const MODELS = {
     parakeet: {name: 'Parakeet', file: 'ggml-parakeet-tdt-0.6b-v3-q4_k.bin', size: '416 MB'},
 };
 
+// The helper records 16 kHz mono 16-bit WAV to
+// $XDG_RUNTIME_DIR/dictate-<its pid>/speech.wav
+const WAV_HEADER = 44;
+const LEVEL_BYTES = 3200; // the last 100 ms
+const LEVEL_FLOOR_DB = -55;
+const LEVEL_CEIL_DB = -15;
+
 function modelPresent(engine) {
     const path = GLib.build_filenamev([DIR, MODELS[engine].file]);
     return GLib.file_test(path, GLib.FileTest.EXISTS);
@@ -93,6 +100,10 @@ export class Dictation {
         return GLib.file_test(HELPER, GLib.FileTest.IS_EXECUTABLE);
     }
 
+    get engineName() {
+        return MODELS[this._engine].name;
+    }
+
     // 'idle' | 'downloading' | 'recording' | 'transcribing'
     get state() {
         if (this._proc)
@@ -158,6 +169,37 @@ export class Dictation {
                         this._onText(text);
                 });
             });
+    }
+
+    // Loudness of the last moment of the recording, 0 to 1, read from the
+    // file the helper is writing; null when it can't be read
+    level() {
+        if (this.state !== 'recording')
+            return null;
+        const path = GLib.build_filenamev([GLib.get_user_runtime_dir(),
+            `dictate-${this._proc.get_identifier()}`, 'speech.wav']);
+        try {
+            const file = Gio.File.new_for_path(path);
+            const size = file.query_info('standard::size', Gio.FileQueryInfoFlags.NONE, null).get_size();
+            if (size <= WAV_HEADER)
+                return 0;
+            const offset = WAV_HEADER + Math.max(0, Math.floor((size - WAV_HEADER - LEVEL_BYTES) / 2) * 2);
+            const stream = file.read(null);
+            stream.seek(offset, GLib.SeekType.SET, null);
+            const bytes = stream.read_bytes(LEVEL_BYTES, null).toArray();
+            stream.close(null);
+
+            const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+            let sum = 0;
+            const count = Math.floor(bytes.byteLength / 2);
+            for (let i = 0; i < count; i++)
+                sum += view.getInt16(i * 2, true) ** 2;
+            const rms = Math.sqrt(sum / Math.max(1, count)) / 32768;
+            const db = 20 * Math.log10(Math.max(rms, 1e-6));
+            return Math.clamp((db - LEVEL_FLOOR_DB) / (LEVEL_CEIL_DB - LEVEL_FLOOR_DB), 0, 1);
+        } catch {
+            return null;
+        }
     }
 
     // Stop recording and transcribe what was said
