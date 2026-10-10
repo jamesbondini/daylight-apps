@@ -86,7 +86,14 @@ function charKey(text, alt = null, accents = null) {
     };
 }
 
-function bottomRow(units, page, label, {multiSource, voice}) {
+// Keys beside the space bar for email and web address fields, like iOS
+const SPACE_EXTRAS = {
+    email: [['@'], ['.']],
+    url: [['/'], ['.', '.com']],
+};
+const DOMAINS = ['.org', '.net', '.edu', '.io', '.de', '.co.uk'];
+
+function bottomRow(units, page, label, {multiSource, voice, variant}) {
     const side = [];
     if (multiSource)
         side.push({kind: 'globe', icon: 'osk-layout-symbolic', width: 1.1});
@@ -95,13 +102,23 @@ function bottomRow(units, page, label, {multiSource, voice}) {
         side.push({kind: 'voice', icon: 'audio-input-microphone-symbolic', width: 1.1});
     const pageKey = {kind: 'page', page, label, width: 1.5};
     const hide = {kind: 'hide', icon: 'osk-hide-symbolic', width: 1.1};
-    const used = side.reduce((sum, k) => sum + k.width, 0) + 2 * pageKey.width + hide.width;
+
+    // The extra keys take the place of the second page key
+    const extras = page === 'numbers' ? SPACE_EXTRAS[variant] : null;
+    const extraKey = text => (text === '.com'
+        ? {...charKey(text, null, DOMAINS), width: 1.5}
+        : charKey(text));
+    const before = extras?.[0].map(extraKey) ?? [];
+    const after = extras ? extras[1].map(extraKey) : [{...pageKey}];
+    const used = [...side, pageKey, ...before, ...after, hide]
+        .reduce((sum, k) => sum + (k.width ?? 1), 0);
 
     return [
         ...side,
         pageKey,
+        ...before,
         {kind: 'space', width: units - used},
-        {...pageKey},
+        ...after,
         hide,
     ];
 }
@@ -187,19 +204,77 @@ function splitPage(page) {
     return {units: page.units + gap, rows};
 }
 
+// A centered phone-style keypad for number fields. The keys beside the 0
+// depend on the field, as {text, alt, accents}.
+const KEYPAD_EXTRAS = {
+    digits: [null, null],
+    number: [{text: '-'}, {text: '.', accents: [',']}],
+    phone: [{text: '*'}, {text: '#'}],
+    date: [{text: '/'}, {text: '-', accents: ['.']}],
+    time: [{text: ':'}, {text: '.'}],
+};
+const KEYPAD_KEY_WIDTH = 1.8;
+
+function keypadPage(variant) {
+    const units = 11.4;
+    const side = {kind: 'split', width: (units - 4 * KEYPAD_KEY_WIDTH) / 2};
+    const key = (text, alt = null, accents = []) =>
+        ({kind: 'char', text, alt, accents, width: KEYPAD_KEY_WIDTH});
+    const digits = row => [...row].map(c => key(c));
+    const extra = spec => (spec
+        ? key(spec.text, null, spec.accents)
+        : {kind: 'split', width: KEYPAD_KEY_WIDTH});
+    const [left, right] = KEYPAD_EXTRAS[variant];
+    const zero = variant === 'phone' ? key('0', '+', ['+']) : key('0');
+    const fn = (kind, props) => ({kind, ...props, width: KEYPAD_KEY_WIDTH});
+
+    return {
+        units,
+        keypad: true,
+        rows: [
+            [side, ...digits('123'), deleteKey(KEYPAD_KEY_WIDTH), {...side}],
+            [side, ...digits('456'), returnKey(KEYPAD_KEY_WIDTH), {...side}],
+            [side, ...digits('789'), fn('page', {page: 'letters', label: 'ABC'}), {...side}],
+            [side, extra(left), zero, extra(right),
+                fn('hide', {icon: 'osk-hide-symbolic'}), {...side}],
+        ],
+    };
+}
+
+// Which keys suit a text field, from its Clutter.InputContentPurpose name
+export function variantFor(purposeName) {
+    return {
+        EMAIL: 'email',
+        URL: 'url',
+        DIGITS: 'digits',
+        PIN: 'digits',
+        NUMBER: 'number',
+        PHONE: 'phone',
+        DATE: 'date',
+        DATETIME: 'date',
+        TIME: 'time',
+    }[purposeName] ?? 'text';
+}
+
 function withoutAlts(page) {
     return {
-        units: page.units,
+        ...page,
         rows: page.rows.map(row => row.map(k => (k.alt ? {...k, alt: null} : k))),
     };
 }
 
-export function buildPages(group, multiSource, {split = false, alts = true, voice = false} = {}) {
-    const pages = basePages(group, {multiSource, voice});
+// The pages for a field: letters, numbers and symbols, plus a keypad that
+// comes first for number fields
+export function buildPages(group, multiSource,
+    {split = false, alts = true, voice = false, variant = 'text'} = {}) {
+    const pages = basePages(group, {multiSource, voice, variant});
+    if (variant in KEYPAD_EXTRAS)
+        pages.keypad = keypadPage(variant);
     for (const name of Object.keys(pages)) {
         if (!alts)
             pages[name] = withoutAlts(pages[name]);
-        if (split)
+        // The keypad is narrow enough already
+        if (split && !pages[name].keypad)
             pages[name] = splitPage(pages[name]);
     }
     return pages;

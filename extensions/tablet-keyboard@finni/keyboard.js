@@ -16,7 +16,7 @@ import * as KeyboardUI from 'resource:///org/gnome/shell/ui/keyboard.js';
 import * as InputSourceManager from 'resource:///org/gnome/shell/ui/status/keyboard.js';
 
 import {findCorrection} from './autocorrect.js';
-import {buildPages} from './layouts.js';
+import {buildPages, variantFor} from './layouts.js';
 import {Dictation} from './voice.js';
 
 const LONG_PRESS_MS = 450;
@@ -38,7 +38,6 @@ const {InputContentPurpose: Purpose, InputContentHintFlags: Hint} = Clutter;
 // Not every purpose exists in every Clutter version
 const purposes = (...names) => new Set(names.map(n => Purpose[n]).filter(p => p !== undefined));
 const TEXT_PURPOSES = purposes('NORMAL', 'ALPHA', 'NAME');
-const NUMERIC_PURPOSES = purposes('DIGITS', 'NUMBER', 'PHONE', 'PIN');
 const CORRECTION_TRIGGERS = /^[.,!?;:]$/;
 
 // The extension object, for settings and the preferences window
@@ -233,7 +232,9 @@ class TabletKeyActor extends St.Widget {
 
     applyMetrics(m) {
         if (this._label) {
-            const size = this.spec.kind === 'char' ? m.char : m.fn;
+            // Longer keys like .com get the smaller function key size
+            const size = this.spec.kind === 'char' && [...this.spec.text].length === 1
+                ? m.char : m.fn;
             this._label.style = `font-size: ${size}px;`;
         }
         if (this._alt) {
@@ -723,6 +724,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             split: this._splitActive,
             alts: this._settings.get_boolean('swipe-symbols'),
             voice: this._dictation.available,
+            variant: variantFor(Object.keys(Purpose).find(name => Purpose[name] === this._purpose)),
         });
         this._voiceShown = this._dictation.available;
     }
@@ -759,7 +761,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             return;
 
         this._cancelAllTouches();
-        this._setPage(NUMERIC_PURPOSES.has(this._purpose) ? 'numbers' : 'letters');
+        this._setPage(this._pages.keypad ? 'keypad' : 'letters');
         if (this._shiftMode !== 'lock')
             this._setShift('off');
         this._updateAutoShift();
@@ -1448,6 +1450,10 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._setSelection(this._selection);
 
         bar.add_child(new St.Widget({x_expand: true}));
+        // Previous and next field, like Shift+Tab and Tab
+        add('go-previous-symbolic', () =>
+            this._sendCombo([Clutter.KEY_Shift_L], Clutter.KEY_Tab));
+        add('go-next-symbolic', () => this._sendKeyval(Clutter.KEY_Tab));
         add('emblem-system-symbolic', () => this._openSettings());
         return bar;
     }
@@ -1619,7 +1625,14 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         case 'page': {
             // Switch on press so a finger can slide onto a symbol and release
             const fromLetters = this._pageName === 'letters';
+            const fromKeypad = this._pageName === 'keypad';
             this._setPage(key.spec.page);
+            // The keypad's keys line up with nothing on the letters page
+            if (fromKeypad) {
+                touch.mode = 'done';
+                touch.key = null;
+                break;
+            }
             touch.mode = 'press';
             touch.key = this._grid.keyAt(touch.x, touch.y);
             touch.key?.add_style_pseudo_class('active');

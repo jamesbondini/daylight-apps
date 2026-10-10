@@ -22,7 +22,7 @@
     </key>
     <key name="shortcut-bar" type="b">
       <default>true</default>
-      <summary>Show undo, redo and paste buttons above the keys</summary>
+      <summary>Show undo, redo, paste and previous/next field buttons above the keys</summary>
     </key>
     <key name="auto-capitalize" type="b">
       <default>true</default>

@@ -37,7 +37,7 @@ export default class TabletKeyboardPreferences extends ExtensionPreferences {
         switchRow(look, 'split-keyboard', 'Split keyboard in landscape',
             'Two halves at the sides, for typing with your thumbs');
         switchRow(look, 'shortcut-bar', 'Shortcut bar',
-            'Undo, redo and paste above the keys, plus cut and copy when text is selected');
+            'Undo, redo and paste above the keys, cut and copy when text is selected, and arrows to the previous and next field');
 
         const scheme = new Adw.ComboRow({
             title: 'Theme',
