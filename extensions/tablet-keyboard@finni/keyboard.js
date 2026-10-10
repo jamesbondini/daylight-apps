@@ -190,20 +190,23 @@ class TabletKeyActor extends St.Widget {
     }
 
     // The mic key shows the microphone level while recording, a wave while
-    // transcribing and a breathing download icon while fetching a model
+    // transcribing, a breathing download icon while fetching a model and a
+    // red crossed-out microphone when it failed
     setVoiceState(state) {
         if (state === this._voiceState)
             return;
         this._voiceState = state;
 
-        for (const s of ['downloading', 'recording', 'transcribing']) {
+        for (const s of ['downloading', 'recording', 'transcribing', 'error']) {
             if (state === s)
                 this.add_style_class_name(`tk-${s}`);
             else
                 this.remove_style_class_name(`tk-${s}`);
         }
-        this.setIcon(state === 'downloading'
-            ? 'folder-download-symbolic' : 'audio-input-microphone-symbolic');
+        this.setIcon({
+            downloading: 'folder-download-symbolic',
+            error: 'microphone-disabled-symbolic',
+        }[state] ?? 'audio-input-microphone-symbolic');
 
         const busy = state === 'recording' || state === 'transcribing';
         this._icon.visible = !busy;
@@ -1044,8 +1047,9 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         return mods;
     }
 
-    _commit(text) {
-        const mods = this._takeMods();
+    // Plain text ignores latched modifiers and leaves them for the next key
+    _commit(text, {plain = false} = {}) {
+        const mods = plain ? new Set() : this._takeMods();
         const controller = this._keyboardController;
 
         if (this._usesInputMethod(mods.size > 0)) {
@@ -1632,9 +1636,10 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             // Switch on press so a finger can slide onto a symbol and release
             const fromLetters = this._pageName === 'letters';
             const fromKeypad = this._pageName === 'keypad';
+            const toKeypad = key.spec.page === 'keypad';
             this._setPage(key.spec.page);
             // The keypad's keys line up with nothing on the letters page
-            if (fromKeypad) {
+            if (fromKeypad || toKeypad) {
                 touch.mode = 'done';
                 touch.key = null;
                 break;
@@ -1863,7 +1868,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     // after a tap leaves it running until the next tap.
     _voiceDown(touch) {
         const dictation = this._dictation;
-        if (dictation.state === 'idle') {
+        if (['idle', 'error'].includes(dictation.state)) {
             dictation.start();
             touch.voiceStarted = GLib.get_monotonic_time() / 1000;
         } else if (dictation.state === 'recording') {
@@ -1883,7 +1888,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (before && !/\s$/.test(before))
             text = ` ${text}`;
         this._lastCorrection = null;
-        this._commit(text);
+        this._commit(text, {plain: true});
         this._lastSpaceTime = 0;
         this._updateAutoShift();
     }

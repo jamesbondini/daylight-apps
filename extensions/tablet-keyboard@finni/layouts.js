@@ -142,6 +142,8 @@ function lettersPage(group, opts) {
     const shiftWidth = (units - r3.length - 2) / 2;
     const withAlts = (row, alts) =>
         row.map((k, i) => charKey(k.text, alts[i] ?? null, k.accents));
+    // Number fields go back to their keypad, like iOS
+    const keypad = opts.variant in KEYPAD_EXTRAS;
 
     return {
         units,
@@ -159,7 +161,7 @@ function lettersPage(group, opts) {
                 charKey('.', '?'),
                 shiftKey(shiftWidth),
             ],
-            bottomRow(units, 'numbers', '.?123', opts),
+            bottomRow(units, keypad ? 'keypad' : 'numbers', keypad ? '123' : '.?123', opts),
         ],
     };
 }

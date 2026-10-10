@@ -26,6 +26,9 @@ const LEVEL_BYTES = 3200; // the last 100 ms
 const LEVEL_FLOOR_DB = -55;
 const LEVEL_CEIL_DB = -15;
 
+// How long the mic key shows that voice typing failed
+const ERROR_MS = 2000;
+
 function modelPresent(engine) {
     // Non-empty, like the helper's own check
     const path = GLib.build_filenamev([DIR, MODELS[engine].file]);
@@ -83,6 +86,7 @@ export class Dictation {
         this._onText = onText;
         this._proc = null;
         this._recording = false;
+        this._errorId = 0;
         this.available = this._probe();
 
         // Follows install and removal while the shell runs
@@ -110,11 +114,31 @@ export class Dictation {
         return MODELS[this._engine].name;
     }
 
-    // 'idle' | 'downloading' | 'recording' | 'transcribing'
+    // 'idle' | 'downloading' | 'recording' | 'transcribing' | 'error'
     get state() {
         if (this._proc)
             return this._recording ? 'recording' : 'transcribing';
-        return downloads.has(this._engine) ? 'downloading' : 'idle';
+        if (downloads.has(this._engine))
+            return 'downloading';
+        return this._errorId ? 'error' : 'idle';
+    }
+
+    // Shows the failure briefly, then goes back to idle
+    _fail() {
+        this._clearError();
+        this._errorId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ERROR_MS, () => {
+            this._errorId = 0;
+            this._onChanged();
+            return GLib.SOURCE_REMOVE;
+        });
+        this._onChanged();
+    }
+
+    _clearError() {
+        if (this._errorId) {
+            GLib.source_remove(this._errorId);
+            this._errorId = 0;
+        }
     }
 
     // Switching to an engine without its model fetches it straight away
@@ -128,9 +152,11 @@ export class Dictation {
         this._onChanged();
     }
 
+    // Retrying straight after a failure is fine
     start() {
-        if (this.state !== 'idle' || !this.available)
+        if (!['idle', 'error'].includes(this.state) || !this.available)
             return;
+        this._clearError();
 
         if (!modelPresent(this._engine)) {
             download(this._engine);
@@ -144,6 +170,7 @@ export class Dictation {
                 Gio.SubprocessFlags.STDERR_SILENCE);
         } catch (e) {
             logError(e, 'tablet-keyboard: cannot start voice typing');
+            this._fail();
             return;
         }
 
@@ -166,11 +193,18 @@ export class Dictation {
                     if (this._proc !== proc)
                         return;
                     this._proc = null;
+                    if (!proc.get_successful()) {
+                        const status = proc.get_if_exited()
+                            ? `exit status ${proc.get_exit_status()}`
+                            : `signal ${proc.get_term_sig()}`;
+                        console.warn(`tablet-keyboard: voice typing failed (${status})`);
+                        this._fail();
+                        return;
+                    }
                     this._onChanged();
 
                     const bytes = o.steal_as_bytes().toArray();
-                    const text = proc.get_successful()
-                        ? new TextDecoder().decode(bytes).trim() : '';
+                    const text = new TextDecoder().decode(bytes).trim();
                     if (text)
                         this._onText(text);
                 });
@@ -238,6 +272,7 @@ export class Dictation {
         this._onChanged = () => {};
         this._onText = () => {};
         this.cancel();
+        this._clearError();
         this._monitor.cancel();
     }
 }

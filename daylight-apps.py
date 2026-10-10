@@ -19,6 +19,7 @@ scripts):
 
 import os
 import re
+import signal
 import sys
 from pathlib import Path
 
@@ -83,6 +84,19 @@ def script_env():
     env = dict(os.environ)
     env.update(TERM="dumb", NO_COLOR="1", PYTHONUNBUFFERED="1")
     return [f"{k}={v}" for k, v in env.items()]
+
+
+def session_pids(sid):
+    """PIDs of live processes in session `sid` (root ones included)."""
+    pids = []
+    for stat in Path("/proc").glob("[0-9]*/stat"):
+        try:
+            fields = stat.read_text().rsplit(")", 1)[1].split()
+        except (OSError, IndexError):
+            continue
+        if fields[0] != "Z" and int(fields[3]) == sid:
+            pids.append(int(stat.parent.name))
+    return pids
 
 
 def check_installed(app, callback):
@@ -216,10 +230,10 @@ class AppPage(Adw.NavigationPage):
         self.busy.append(Adw.Spinner(width_request=24, height_request=24))
         self.busy_label = Gtk.Label(xalign=0, hexpand=True, ellipsize=Pango.EllipsizeMode.END)
         self.busy.append(self.busy_label)
-        cancel = Gtk.Button(label="Cancel")
-        cancel.add_css_class("pill")
-        cancel.connect("clicked", lambda *_: self.proc and self.proc.force_exit())
-        self.busy.append(cancel)
+        self.cancel_button = Gtk.Button(label="Cancel")
+        self.cancel_button.add_css_class("pill")
+        self.cancel_button.connect("clicked", lambda *_: self.cancel())
+        self.busy.append(self.cancel_button)
         box.append(self.busy)
         box.append(self.extras_group)
 
@@ -269,11 +283,12 @@ class AppPage(Adw.NavigationPage):
             self.syncing = False
         self.switch_row.set_sensitive(not running and not app.toggling)
         self.switch_row.set_subtitle("Switching…" if app.toggling else app.status)
-        self.update_extras(running)
+        self.update_extras(running or app.toggling)
 
         while child := self.actions.get_first_child():
             self.actions.remove(child)
         self.actions.set_visible(not running and app.installed is not None)
+        self.actions.set_sensitive(not app.toggling)
         self.busy.set_visible(running)
         if running or app.installed is None:
             return
@@ -356,6 +371,8 @@ class AppPage(Adw.NavigationPage):
         dialog.present(self.window)
 
     def run(self, script, label, args=(), what=None):
+        if self.proc or self.app.toggling:
+            return
         self.buffer.set_text("")
         self.urls.clear()
         while child := self.links.get_first_child():
@@ -363,26 +380,34 @@ class AppPage(Adw.NavigationPage):
         self.links.set_visible(False)
         self.log_box.set_visible(True)
         self.busy_label.set_label(label)
+        self.cancel_button.set_sensitive(True)
+        self.cancelling = False
+        self.pending = 2  # stdout EOF and process exit
 
         launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_MERGE)
         launcher.set_environ(script_env())
         launcher.set_cwd(str(self.app.path))
         try:
-            self.proc = launcher.spawnv([str(self.app.path / script), *args])
+            # Own session, so Cancel can find and stop the script's children too.
+            self.proc = launcher.spawnv(["setsid", str(self.app.path / script), *args])
         except GLib.Error as e:
             self.append(f"Failed to start: {e.message}\n")
             return
+        self.sid = int(self.proc.get_identifier())
         self.window.on_status(self.app)
-        stream = Gio.DataInputStream.new(self.proc.get_stdout_pipe())
+        self.stream = stream = Gio.DataInputStream.new(self.proc.get_stdout_pipe())
         stream.read_line_async(GLib.PRIORITY_DEFAULT, None, self.on_line, stream)
         self.proc.wait_async(None, self.on_exit, (script, what or self.app.name))
 
     def on_line(self, stream, res, _data):
+        if stream is not self.stream:  # left over from an earlier run
+            return
         try:
             line, _ = stream.read_line_finish_utf8(res)
         except GLib.Error:
             line = None
         if line is None:
+            self.step_done()
             return
         # Progress bars redraw with \r; keep only the final state of the line.
         line = ANSI_RE.sub("", line).rstrip("\r").split("\r")[-1]
@@ -412,18 +437,50 @@ class AppPage(Adw.NavigationPage):
         self.links.append(button)
         self.links.set_visible(True)
 
+    def cancel(self):
+        """Stop the script and its children; root children may finish their step."""
+        if not self.proc or self.cancelling:
+            return
+        self.cancelling = True
+        self.busy_label.set_label("Cancelling…")
+        self.cancel_button.set_sensitive(False)
+        for pid in session_pids(self.sid):
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:  # gone, or root (e.g. via pkexec)
+                pass
+
     def on_exit(self, proc, res, data):
-        script, what = data
         try:
             proc.wait_finish(res)
         except GLib.Error:
             pass
+        self.exit_data = data
+        self.step_done()
+        if self.pending:
+            # Something left in the background may hold stdout open; don't wait forever.
+            GLib.timeout_add(1000, lambda: self.proc is proc and self.pending and self.step_done() and False)
+
+    def step_done(self):
+        self.pending -= 1
+        if self.pending == 0:
+            self.finish()
+
+    def finish(self):
+        if self.cancelling and session_pids(self.sid):
+            GLib.timeout_add(500, lambda: self.finish() and False)
+            return
+        script, what = self.exit_data
+        proc = self.proc
         ok = proc.get_if_exited() and proc.get_exit_status() == 0
         self.proc = None
         verb = {"install": "Install", "remove": "Removal", "setup": "Setup",
                 "extra-add": "Download", "extra-remove": "Removal"}.get(script, script)
         if ok:
             self.window.toast(f"{verb} of {what} finished")
+        elif self.cancelling:
+            self.append("\nCancelled.")
+            self.window.toast(f"{verb} of {what} cancelled")
         else:
             self.append("\nFailed." if proc.get_if_exited() else "\nCancelled.")
             self.window.toast(f"{verb} of {what} failed")

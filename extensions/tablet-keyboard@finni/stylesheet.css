@@ -191,7 +191,8 @@
 }
 
 /* Voice typing: red with white level bars while recording, grey bars
- * while transcribing, a dimmed icon while downloading a model */
+ * while transcribing, a dimmed icon while downloading a model and a red
+ * icon when it failed */
 .tk-key.tk-voice.tk-recording,
 .tk-dark .tk-key.tk-voice.tk-recording {
   background-color: #ff3b30;
@@ -208,6 +209,10 @@
 
 .tk-key.tk-voice.tk-downloading .tk-icon {
   color: #8a8a8e;
+}
+
+.tk-key.tk-voice.tk-error .tk-icon {
+  color: #ff3b30;
 }
 
 /* Monochrome: outlined keys, no shadows, and black with white text for
@@ -253,6 +258,10 @@
 
 .tk-mono .tk-key.tk-voice.tk-downloading .tk-icon {
   color: #555555;
+}
+
+.tk-mono .tk-key.tk-voice.tk-error .tk-icon {
+  color: #000000;
 }
 
 .tk-mono .tk-trackpad .tk-key,
