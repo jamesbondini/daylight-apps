@@ -25,6 +25,6 @@ info "Kept ~/.config/AirPodsTrayApp (pairing keys and settings)."
 
 if apk_present .daylight-airpods; then
   step "Removing build tools and Qt (asks for your password)"
-  as_root "apk del .daylight-airpods || true"
+  as_root "$(apk_del_cmd .daylight-airpods)"
 fi
 step "Done"

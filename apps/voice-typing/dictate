@@ -36,6 +36,11 @@ if [ "${1:-}" = --download ]; then
   file="$(model_file "$engine")" || exit 2
   [ -s "$MODELS/$file" ] && exit 0
   mkdir -p "$MODELS"
+  # The keyboard and the app can both start a download; two curls resuming
+  # into the same .part would corrupt it, so the second waits for the first
+  exec 9>"$MODELS/$file.lock"
+  flock 9
+  [ -s "$MODELS/$file" ] && exit 0
   # -C - resumes an interrupted download
   curl -fL -C - --progress-bar -o "$MODELS/$file.part" "$(model_url "$engine")" || exit 1
   mv "$MODELS/$file.part" "$MODELS/$file"

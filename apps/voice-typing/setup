@@ -3,7 +3,7 @@
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 require_terminal "$0"
 
-DICTATE="$HOME/.local/share/daylight-apps/voice-typing/dictate"
+DICTATE="${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing/dictate"
 engine=$(voice_engine)
 "$DICTATE" --download "$engine" || fail "Download failed"
 echo "Engine: ${engine^}. Say something, then press Enter."

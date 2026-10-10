@@ -24,7 +24,8 @@ fi
 step "Downloading omarchy-pods"
 mkdir -p "$DATA"
 [ -d "$SRC/.git" ] || git clone --quiet "$REPO" "$SRC"
-git -C "$SRC" fetch --quiet origin
+# Fetch only when the pinned commit is missing, so Update also works offline
+git -C "$SRC" cat-file -e "$REV^{commit}" 2>/dev/null || git -C "$SRC" fetch --quiet origin
 git -C "$SRC" checkout --quiet --force "$REV"
 
 step "Building the librepods daemon (takes a few minutes)"

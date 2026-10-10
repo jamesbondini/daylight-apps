@@ -5,7 +5,7 @@ source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 HERE="$(dirname "$(readlink -f "$0")")"
 path="$("$HERE/dictate" --path "${1:-}" 2>/dev/null)" || fail "Unknown model: ${1:-}"
 step "Removing the ${1^} model"
-rm -f "$path" "$path.part"
+rm -f "$path" "$path.part" "$path.lock"
 step "Done"
 if [ "$1" = "$(voice_engine)" ]; then
   info "The keyboard uses ${1^}: it downloads the model again on your next"
