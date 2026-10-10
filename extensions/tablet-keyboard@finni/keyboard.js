@@ -545,6 +545,10 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             GLib.source_remove(this._surroundingRetryId);
             this._surroundingRetryId = 0;
         }
+        if (this._imFlushId) {
+            GLib.source_remove(this._imFlushId);
+            this._imFlushId = 0;
+        }
     }
 
     _syncColorScheme() {
@@ -641,6 +645,8 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
     _onFocusChanged(focusTracker) {
         super._onFocusChanged(focusTracker);
+        // Text reported before the focus moved belongs to someone else
+        this._surroundingFocus = null;
         this._syncToolbar();
     }
 
@@ -802,6 +808,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
     _onSurroundingText() {
         const [text, cursor, anchor] = Main.inputMethod.getSurroundingText();
+        this._surroundingFocus = typeof text === 'string' ? Main.inputMethod.currentFocus : null;
         if (text === null || text === undefined || cursor === null)
             return;
 
@@ -892,18 +899,57 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         const mods = this._takeMods();
         const controller = this._keyboardController;
 
-        if (this._usesInputMethod(mods.size > 0))
-            this._enqueue(() => Main.inputMethod.commit(text));
-        else
-            this._enqueue(() => controller.commit(text, mods));
+        if (this._usesInputMethod(mods.size > 0)) {
+            this._imBatch().text += text;
+        } else {
+            this._enqueue(() => {
+                this._flushIm();
+                controller.commit(text, mods);
+            });
+        }
 
         this._noteTyped(text);
+    }
+
+    // Text-input clients apply one delete and one commit per 'done' event,
+    // and mutter sends 'done' once per main loop cycle: a second commit in the
+    // same cycle replaces the first. So collect them and send one batch.
+    _imBatch() {
+        if (!this._imPending) {
+            this._imPending = {before: 0, text: ''};
+            // After mutter's 'done' idle at CLUTTER_PRIORITY_EVENTS + 1
+            this._imFlushId = GLib.idle_add(GLib.PRIORITY_DEFAULT + 2, () => {
+                this._imFlushId = 0;
+                this._flushIm();
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+        return this._imPending;
+    }
+
+    _flushIm() {
+        if (this._imFlushId) {
+            GLib.source_remove(this._imFlushId);
+            this._imFlushId = 0;
+        }
+        const pending = this._imPending;
+        this._imPending = null;
+        if (!pending)
+            return;
+
+        // Checked again when sent, as the focus may have moved since
+        const {before, text} = pending;
+        if (before > 0 && this._surroundingHolds(-before, before))
+            Main.inputMethod.delete_surrounding(-before, before);
+        if (text)
+            Main.inputMethod.commit(text);
     }
 
     _sendKeyval(keyval) {
         const mods = this._takeMods();
         const controller = this._keyboardController;
         this._enqueue(() => {
+            this._flushIm();
             for (const mod of mods)
                 controller.keyvalPress(mod);
             controller.keyvalPress(keyval);
@@ -916,6 +962,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     _sendCombo(mods, keyval) {
         const controller = this._keyboardController;
         this._enqueue(() => {
+            this._flushIm();
             for (const mod of mods)
                 controller.keyvalPress(mod);
             controller.keyvalPress(keyval);
@@ -925,20 +972,68 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         });
     }
 
+    // Whether delete_surrounding(offset, length) stays inside the text the app
+    // last reported. Mutter crashes on anything else: after a focus change, or
+    // in apps that never report their text (terminals), it has no text at all,
+    // while the shell may still hold text from an earlier focus.
+    _surroundingHolds(offset, length) {
+        if (!this._usesInputMethod(false) || !this._surroundingFocus ||
+            this._surroundingFocus !== Main.inputMethod.currentFocus)
+            return false;
+        const [text, cursor] = Main.inputMethod.getSurroundingText();
+        if (typeof text !== 'string' || typeof cursor !== 'number')
+            return false;
+        return offset <= 0 && -offset <= cursor &&
+            offset + length <= [...text].length - cursor;
+    }
+
+    // How a backspace of `count` characters splits into text still waiting
+    // in the batch and characters the app already has
+    _splitDelete(count) {
+        const pending = this._imPending;
+        const trimmed = Math.min(count, pending ? [...pending.text].length : 0);
+        const before = (pending?.before ?? 0) + count - trimmed;
+        return {trimmed, before, ok: trimmed === count || this._surroundingHolds(-before, before)};
+    }
+
+    // Whether `count` characters before the cursor can be deleted in order
+    // with a following commit
+    _canReplaceBack(count) {
+        return !this._usesInputMethod(false) || this._splitDelete(count).ok;
+    }
+
     // Deletes `count` characters before the cursor, or the selection
     _deleteBack(count = 1) {
         const controller = this._keyboardController;
-        if (this._usesInputMethod(false)) {
-            const [offset, length] = this._selection ?? [-count, count];
-            this._enqueue(() => Main.inputMethod.delete_surrounding(offset, length));
-        } else {
+        const backspaces = presses => this._enqueue(() => {
+            this._flushIm();
+            for (let i = 0; i < presses; i++) {
+                controller.keyvalPress(Clutter.KEY_BackSpace);
+                controller.keyvalRelease(Clutter.KEY_BackSpace);
+            }
+        });
+
+        if (this._selection) {
+            const [offset, length] = this._selection;
             this._enqueue(() => {
-                for (let i = 0; i < count; i++) {
-                    controller.keyvalPress(Clutter.KEY_BackSpace);
-                    controller.keyvalRelease(Clutter.KEY_BackSpace);
-                }
+                this._flushIm();
+                if (this._surroundingHolds(offset, length))
+                    Main.inputMethod.delete_surrounding(offset, length);
+                else
+                    backspaces(1);
             });
+            return;
         }
+
+        const split = this._usesInputMethod(false) ? this._splitDelete(count) : null;
+        if (!split?.ok) {
+            backspaces(count);
+            return;
+        }
+        const batch = this._imBatch();
+        if (split.trimmed > 0)
+            batch.text = [...batch.text].slice(0, -split.trimmed).join('');
+        batch.before = split.before;
     }
 
     // Replaces the word just typed if it is a known mistake. Returns the fix.
@@ -953,6 +1048,8 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             return null;
 
         const length = [...fix.original].length;
+        if (!this._canReplaceBack(length))
+            return null;
         this._deleteBack(length);
         this._noteDeleted(length);
         this._commit(fix.replacement);
@@ -967,6 +1064,8 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             return false;
 
         const length = [...fix.replacement].length + [...fix.trigger].length;
+        if (!this._canReplaceBack(length))
+            return false;
         this._deleteBack(length);
         this._noteDeleted(length);
         this._commit(fix.original);
@@ -1001,7 +1100,8 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (this._textAssist() && this._mods.size === 0 &&
             this._settings.get_boolean('double-space-period') &&
             now - this._lastSpaceTime < DOUBLE_SPACE_MS &&
-            text.endsWith(' ') && /[\p{L}\p{N}]$/u.test(text.slice(0, -1))) {
+            text.endsWith(' ') && /[\p{L}\p{N}]$/u.test(text.slice(0, -1)) &&
+            this._canReplaceBack(1)) {
             this._deleteBack();
             this._noteDeleted();
             this._commit('. ');
@@ -1072,6 +1172,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             // X11 clients: delete via the IM
             const controller = this._keyboardController;
             this._enqueue(() => {
+                this._flushIm();
                 controller.toggleDelete(true, true);
                 controller.toggleDelete(false, true);
             });
@@ -1084,14 +1185,13 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     // The previous word and the spaces after it, like Ctrl+Backspace
     _deleteWord() {
         const word = this._history.match(/\S*\s*$/u)[0];
-        if (this._usesInputMethod(false) && word.length > 0 && !this._selection) {
-            const length = [...word].length;
+        const length = [...word].length;
+        if (length > 0 && !this._selection && this._usesInputMethod(false) &&
+            this._splitDelete(length).ok)
             this._deleteBack(length);
-            this._noteDeleted(length);
-        } else {
+        else
             this._sendCombo([Clutter.KEY_Control_L], Clutter.KEY_BackSpace);
-            this._noteDeleted([...word].length);
-        }
+        this._noteDeleted(length);
     }
 
     _deleteUp(touch) {

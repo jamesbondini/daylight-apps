@@ -18,6 +18,8 @@ function destroyKeyboard(manager) {
     // The stock keyboard leaves its swipe-to-dismiss gesture behind
     if (Main.uiGroup.get_actions().includes(keyboard._panGesture))
         Main.uiGroup.remove_action(keyboard._panGesture);
+    // ...and its overview 'showing' handler, which would close it after death
+    keyboard.close = () => {};
     keyboard.destroy();
     manager._keyboard = null;
 }
