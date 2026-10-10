@@ -26,13 +26,13 @@ model_url() {
 }
 
 if [ "${1:-}" = --path ]; then
-  file="$(model_file "${2:-whisper}")" || exit 2
+  file="$(model_file "${2-whisper}")" || exit 2
   echo "$MODELS/$file"
   exit 0
 fi
 
 if [ "${1:-}" = --download ]; then
-  engine="${2:-whisper}"
+  engine="${2-whisper}"
   file="$(model_file "$engine")" || exit 2
   [ -s "$MODELS/$file" ] && exit 0
   mkdir -p "$MODELS"

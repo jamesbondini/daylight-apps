@@ -1189,7 +1189,9 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     _autocorrect() {
         const keep = this._keepWord;
         this._keepWord = null;
-        if (!this._settings.get_boolean('autocorrect') || !this._textAssist() || this._mods.size > 0)
+        // With a selection _deleteBack() would delete it instead of the word
+        if (!this._settings.get_boolean('autocorrect') || !this._textAssist() ||
+            this._mods.size > 0 || this._selection)
             return null;
 
         const fix = findCorrection(this._history);
@@ -1246,7 +1248,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._lastCorrection = null;
 
         // Double-tap space: replace the first space with ". "
-        if (this._textAssist() && this._mods.size === 0 &&
+        if (this._textAssist() && this._mods.size === 0 && !this._selection &&
             this._settings.get_boolean('double-space-period') &&
             now - this._lastSpaceTime < DOUBLE_SPACE_MS &&
             text.endsWith(' ') && /[\p{L}\p{N}]$/u.test(text.slice(0, -1)) &&
@@ -1573,6 +1575,10 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             for (const other of this._touches.values()) {
                 if (other.mode === 'press' && other.key?.spec.kind === 'char') {
                     this._clearTimer(other);
+                    // Stay on this page: the new key is on it, and switching
+                    // would destroy it
+                    if (other.slide)
+                        other.slide.returnToLetters = false;
                     this._releaseKey(other);
                     other.mode = 'done';
                 }

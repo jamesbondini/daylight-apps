@@ -89,7 +89,12 @@ def check_installed(app, callback):
     """Run the app's `installed` script asynchronously."""
     launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
     launcher.set_environ(script_env())
-    proc = launcher.spawnv([str(app.path / "installed")])
+    try:
+        proc = launcher.spawnv([str(app.path / "installed")])
+    except GLib.Error:  # missing or not executable
+        app.installed, app.status, app.enabled, app.extras = False, "", None, []
+        callback(app)
+        return
 
     def done(proc, res):
         try:

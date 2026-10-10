@@ -6,4 +6,4 @@ step "Connecting to Tailscale"
 info "If a login link appears, open it and sign in. This waits until you do."
 tailscale up --accept-routes
 step "Connected"
-tailscale status | head -20
+tailscale status | head -20 || true

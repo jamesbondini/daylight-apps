@@ -73,9 +73,27 @@ require_terminal() {
   fi
 }
 
+# Add or remove an item of an org.gnome.shell string list, e.g. enabled-extensions.
+shell_strv_set() {
+  local key="$1" item="$2" add="$3" current
+  current=$(gsettings get org.gnome.shell "$key")
+  python3 - "$item" "$add" "$current" <<'PY' | xargs -0 -r gsettings set org.gnome.shell "$key"
+import ast, sys
+item, add, current = sys.argv[1], sys.argv[2] == "true", sys.argv[3]
+items = ast.literal_eval(current.removeprefix("@as ")) or []
+new = [i for i in items if i != item] + ([item] if add else [])
+if add and item in items:
+    new = items
+if new != items:
+    print(repr(new), end="")
+PY
+}
+
 # Enable or disable a GNOME Shell extension. gnome-extensions only knows
 # extensions the shell has loaded, so also edit the enabled-extensions list
-# directly for ones installed during this session.
+# directly for ones installed during this session. disabled-extensions wins
+# over enabled-extensions, and `gnome-extensions disable` adds to it, so
+# enabling also takes the extension off that list.
 gnome_ext_set_enabled() {
   local uuid="$1" enable="$2"
   if [ "$enable" = true ]; then
@@ -83,19 +101,9 @@ gnome_ext_set_enabled() {
   else
     gnome-extensions disable "$uuid" 2>/dev/null || true
   fi
-  local current
-  current=$(gsettings get org.gnome.shell enabled-extensions)
-  python3 - "$uuid" "$enable" "$current" <<'PY' | xargs -0 -r gsettings set org.gnome.shell enabled-extensions
-import ast, sys
-uuid, enable, current = sys.argv[1], sys.argv[2] == "true", sys.argv[3]
-items = ast.literal_eval(current.removeprefix("@as ")) or []
-new = [i for i in items if i != uuid] + ([uuid] if enable else [])
-if enable and uuid in items:
-    new = items
-if new != items:
-    print(repr(new), end="")
-PY
+  shell_strv_set enabled-extensions "$uuid" "$enable"
   if [ "$enable" = true ]; then
+    shell_strv_set disabled-extensions "$uuid" false
     gsettings set org.gnome.shell disable-user-extensions false
   fi
 }
@@ -104,6 +112,9 @@ PY
 # only become active after logging out and in, if installed this session).
 gnome_ext_enabled() {
   [ "$(gsettings get org.gnome.shell disable-user-extensions)" = false ] || return 1
+  case "$(gsettings get org.gnome.shell disabled-extensions)" in
+    *"'$1'"*) return 1 ;;
+  esac
   case "$(gsettings get org.gnome.shell enabled-extensions)" in
     *"'$1'"*) return 0 ;;
     *) return 1 ;;
