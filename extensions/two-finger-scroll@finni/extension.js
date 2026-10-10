@@ -38,16 +38,65 @@ const FRAME_MS = 16;
 // click, which selects a word. Keep our click at least this far away.
 const CLICK_CLEARANCE = 64;
 
+// Wayland apps only get scroll events through a pointer, so the scrolls come
+// from a virtual one. Any pointer device takes Mutter out of touch mode, which
+// hides the on-screen keyboard and the Auto Rotate toggle, so the shell is
+// told to ignore it below. It is created once and never unplugged: back in
+// touch mode, Mutter re-applies its own stale screen rotation, which is
+// upside down on the DC-1.
+let virtualPointer = null;
+
 function isPointer(device) {
     return device.device_type === Clutter.InputDeviceType.POINTER_DEVICE ||
         device.device_type === Clutter.InputDeviceType.TOUCHPAD_DEVICE;
 }
 
+// Virtual devices have no device node
+function isVirtualPointer(device) {
+    return isPointer(device) && device.get_device_node() === null;
+}
+
+function getVirtualPointer() {
+    if (virtualPointer)
+        return virtualPointer;
+
+    // Touch mode as if the virtual pointer weren't there
+    const seat = global.stage.context.get_backend().get_default_seat();
+    seat.get_touch_mode = () => {
+        if (Clutter.Seat.prototype.get_touch_mode.call(seat))
+            return true;
+        const devices = seat.list_devices();
+        return devices.some(d => d.device_type === Clutter.InputDeviceType.TOUCHSCREEN_DEVICE) &&
+            !devices.some(d => isPointer(d) && !isVirtualPointer(d));
+    };
+
+    // Mutter only manages rotation in touch mode, and the Auto Rotate toggle
+    // only shows when it does. The DC-1 rotates the screen itself, following
+    // the toggle's setting.
+    const monitorManager = global.backend.get_monitor_manager();
+    const orientationManager = global.backend.get_orientation_manager();
+    monitorManager.get_panel_orientation_managed = () =>
+        Meta.MonitorManager.prototype.get_panel_orientation_managed.call(monitorManager) ||
+        (seat.get_touch_mode() && orientationManager.has_accelerometer() &&
+         monitorManager.get_is_builtin_display_on());
+
+    // The keyboard comes up after a touch; decide on the last real device,
+    // not on the virtual pointer after a scroll.
+    let lastWasTouch = true;
+    Main.keyboard._lastDeviceIsTouchscreen = function () {
+        const device = this._lastDevice;
+        if (device && !isVirtualPointer(device))
+            lastWasTouch = device.device_type === Clutter.InputDeviceType.TOUCHSCREEN_DEVICE;
+        return lastWasTouch;
+    };
+
+    virtualPointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+    return virtualPointer;
+}
+
 export default class TwoFingerScrollExtension extends Extension {
     enable() {
-        const seat = global.stage.context.get_backend().get_default_seat();
-        this._pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
-        this._hideFromKeyboard(seat);
+        this._pointer = getVirtualPointer();
         this._cursorTracker = global.backend.get_cursor_tracker();
         this._lastX = -1;
         this._lastY = -1;
@@ -73,32 +122,6 @@ export default class TwoFingerScrollExtension extends Extension {
                 this._stopMomentum();
             return Clutter.EVENT_PROPAGATE;
         });
-    }
-
-    // Mutter leaves touch mode when a pointer device is plugged in, and the
-    // on-screen keyboard only comes up in touch mode after a touch. Our
-    // virtual pointer would count as both a plugged-in mouse and, after a
-    // scroll, the last device used, so the keyboard would never show.
-    // Virtual devices have no device node; don't count them as pointers.
-    _hideFromKeyboard(seat) {
-        this._seat = seat;
-        seat.get_touch_mode = () => {
-            if (Clutter.Seat.prototype.get_touch_mode.call(seat))
-                return true;
-            const devices = seat.list_devices();
-            return devices.some(d => d.device_type === Clutter.InputDeviceType.TOUCHSCREEN_DEVICE) &&
-                !devices.some(d => isPointer(d) && d.get_device_node() !== null);
-        };
-
-        // Decide on the last real device instead of our virtual one.
-        const keyboard = Main.keyboard;
-        let lastWasTouch = true;
-        keyboard._lastDeviceIsTouchscreen = function () {
-            const device = this._lastDevice;
-            if (device && !(isPointer(device) && device.get_device_node() === null))
-                lastWasTouch = device.device_type === Clutter.InputDeviceType.TOUCHSCREEN_DEVICE;
-            return lastWasTouch;
-        };
     }
 
     _mayRecognize() {
@@ -213,12 +236,7 @@ export default class TwoFingerScrollExtension extends Extension {
         global.stage.disconnect(this._touchId);
         global.stage.remove_action(this._gesture);
         this._gesture = null;
-        // Unplug the virtual pointer now rather than whenever it's collected
-        this._pointer.run_dispose();
         this._pointer = null;
-        delete this._seat.get_touch_mode;
-        this._seat = null;
-        delete Main.keyboard._lastDeviceIsTouchscreen;
         this._cursorTracker = null;
         this._window = null;
     }
