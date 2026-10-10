@@ -1,0 +1,48 @@
+#!/bin/bash
+# The DC-1 image binds the buttons in GNOME Shell itself (XF86Launch1 to
+# show-screenshot-ui, XF86Launch2 to toggle-overview), which would race our
+# extension for the key. `shell-keys take` removes those, `shell-keys give`
+# puts back only what `take` removed. The extension's defaults keep the same
+# behaviour.
+set -e
+SCHEMA=org.gnome.shell.keybindings
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/daylight-apps/hardware-buttons-taken"
+
+edit() { # key accel add|remove
+  local current
+  current=$(gsettings get "$SCHEMA" "$1")
+  local updated
+  updated=$(python3 -c '
+import ast, sys
+value = sys.argv[1].removeprefix("@as ")
+keys = [k for k in ast.literal_eval(value) if k]
+accel, op = sys.argv[2], sys.argv[3]
+if op == "remove":
+    keys = [k for k in keys if k != accel]
+elif accel not in keys:
+    keys.append(accel)
+print(repr(keys) if keys else "@as []")
+' "$current" "$2" "$3")
+  [ "$updated" = "$current" ] || gsettings set "$SCHEMA" "$1" "$updated"
+}
+
+case "$1" in
+  take)
+    mkdir -p "$(dirname "$STATE")"
+    for pair in show-screenshot-ui:XF86Launch1 toggle-overview:XF86Launch2; do
+      key=${pair%%:*} accel=${pair#*:}
+      if gsettings get "$SCHEMA" "$key" | grep -q "'$accel'"; then
+        grep -qx "$pair" "$STATE" 2>/dev/null || echo "$pair" >> "$STATE"
+        edit "$key" "$accel" remove
+      fi
+    done
+    ;;
+  give)
+    [ -f "$STATE" ] || exit 0
+    while IFS=: read -r key accel; do
+      [ -n "$key" ] && edit "$key" "$accel" add
+    done < "$STATE"
+    rm -f "$STATE"
+    ;;
+  *) echo "usage: $0 take|give" >&2; exit 2 ;;
+esac

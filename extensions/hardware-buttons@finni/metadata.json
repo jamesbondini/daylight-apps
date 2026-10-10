@@ -1,0 +1,7 @@
+{
+  "uuid": "hardware-buttons@finni",
+  "name": "Hardware Buttons",
+  "description": "Gives the DC-1's two programmable buttons (XF86Launch1 and XF86Launch2) an action for a press and one for a hold: open an app, a GNOME Shell function, a device toggle, voice typing or a command. Set them up in Daylight Apps.",
+  "settings-schema": "org.gnome.shell.extensions.hardware-buttons",
+  "shell-version": ["48"]
+}

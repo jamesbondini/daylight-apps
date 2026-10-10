@@ -1,0 +1,27 @@
+#!/bin/bash
+# Install and enable the bundled hardware-buttons GNOME Shell extension.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+UUID=hardware-buttons@finni
+SRC="$(dirname "$(readlink -f "$0")")/../../extensions/$UUID"
+DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
+
+step "Copying extension to $DEST"
+rm -rf "$DEST"
+mkdir -p "$DEST"
+cp -r "$SRC"/. "$DEST"/
+glib-compile-schemas "$DEST/schemas"
+
+step "Taking the buttons over from GNOME Shell's own shortcuts"
+"$(dirname "$(readlink -f "$0")")/shell-keys" take
+
+step "Enabling extension"
+gnome_ext_set_enabled "$UUID" true
+
+if gnome-extensions info "$UUID" 2>/dev/null | grep -q "State: ACTIVE"; then
+  step "Done"
+  info "Active. Pick what each button does below."
+else
+  step "Done"
+  info "Log out and back in to activate it (Wayland only loads new extensions at login)."
+fi

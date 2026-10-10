@@ -1,0 +1,8 @@
+#!/bin/bash
+# Turn the extension off, keeping it installed.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Disabling extension"
+gnome_ext_set_enabled hardware-buttons@finni false
+"$(dirname "$(readlink -f "$0")")/shell-keys" give
+info "Off. The buttons do what GNOME Shell had them do again."

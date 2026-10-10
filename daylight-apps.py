@@ -15,12 +15,17 @@ scripts):
              ID|Title|Subtitle|yes-or-no (downloaded); `extra-add ID` and
              `extra-remove ID` download and delete one. Group title comes
              from EXTRAS_TITLE in info.
+  page.py    optional: Python module whose build(window) returns a widget
+             (or None) shown on the app's page while it is installed, for
+             settings such as Hardware Buttons'.
 """
 
+import importlib.util
 import os
 import re
 import signal
 import sys
+import traceback
 from pathlib import Path
 
 import gi
@@ -97,6 +102,21 @@ def session_pids(sid):
         if fields[0] != "Z" and int(fields[3]) == sid:
             pids.append(int(stat.parent.name))
     return pids
+
+
+def build_custom_page(app, window):
+    """The widget from the app's page.py, or None."""
+    path = app.path / "page.py"
+    if not path.exists():
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location(f"daylight_page_{app.id.replace('-', '_')}", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.build(window)
+    except Exception:  # a broken page must not take the app down
+        traceback.print_exc()
+        return None
 
 
 def check_installed(app, callback):
@@ -216,6 +236,11 @@ class AppPage(Adw.NavigationPage):
         self.switch_group.add(self.switch_row)
         box.append(self.switch_group)
 
+        # Settings from the app's page.py, built once it is installed
+        self.custom_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, visible=False)
+        self.custom = None
+        box.append(self.custom_box)
+
         # Optional parts, e.g. downloadable models
         self.extras_group = Adw.PreferencesGroup(title=app.meta.get("EXTRAS_TITLE", "Extras"), visible=False)
         self.extra_rows = []
@@ -284,6 +309,11 @@ class AppPage(Adw.NavigationPage):
         self.switch_row.set_sensitive(not running and not app.toggling)
         self.switch_row.set_subtitle("Switching…" if app.toggling else app.status)
         self.update_extras(running or app.toggling)
+        if app.installed and not self.custom:
+            self.custom = build_custom_page(app, self.window)
+            if self.custom:
+                self.custom_box.append(self.custom)
+        self.custom_box.set_visible(bool(app.installed) and self.custom is not None)
 
         while child := self.actions.get_first_child():
             self.actions.remove(child)

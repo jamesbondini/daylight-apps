@@ -1,0 +1,4 @@
+NAME=Hardware Buttons
+SUMMARY=Choose what the two programmable buttons do when pressed or held: open an app, the overview, a screenshot, voice typing, dark style and more.
+ICON=input-keyboard-symbolic preferences-desktop-keyboard-shortcuts-symbolic
+WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/extensions/hardware-buttons@finni

@@ -1883,6 +1883,19 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             this._dictation.stop();
     }
 
+    // For the Hardware Buttons extension: start or stop voice typing.
+    // Returns the new state, or null when voice typing isn't installed.
+    toggleDictation() {
+        const dictation = this._dictation;
+        if (!dictation?.available)
+            return null;
+        if (dictation.state === 'recording')
+            dictation.stop();
+        else
+            dictation.start();
+        return dictation.state;
+    }
+
     _typeDictation(text) {
         // Separate from the word before the cursor
         const before = this._history;

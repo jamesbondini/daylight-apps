@@ -1,0 +1,15 @@
+#!/bin/bash
+# Disable and remove the hardware-buttons extension. Button settings are kept.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+UUID=hardware-buttons@finni
+
+step "Disabling extension"
+gnome_ext_set_enabled "$UUID" false
+"$(dirname "$(readlink -f "$0")")/shell-keys" give
+
+step "Removing files"
+rm -rf "$HOME/.local/share/gnome-shell/extensions/$UUID"
+
+step "Done"
+info "The buttons do what GNOME Shell had them do again."

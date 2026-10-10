@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <!-- The press defaults are what the DC-1 image binds the buttons to in
+       org.gnome.shell.keybindings. Actions: "" (nothing), "app:<desktop id>", "shell:<name>" (see
+       ACTIONS in extension.js) or "command:<shell command>" -->
+  <schema id="org.gnome.shell.extensions.hardware-buttons"
+          path="/org/gnome/shell/extensions/hardware-buttons/">
+    <key name="button1-key" type="as">
+      <default>['XF86Launch1']</default>
+      <summary>Key of button 1</summary>
+    </key>
+    <key name="button2-key" type="as">
+      <default>['XF86Launch2']</default>
+      <summary>Key of button 2</summary>
+    </key>
+    <key name="button1-press" type="s">
+      <default>'shell:screenshot'</default>
+      <summary>Action when button 1 is pressed</summary>
+    </key>
+    <key name="button1-hold" type="s">
+      <default>''</default>
+      <summary>Action when button 1 is held</summary>
+    </key>
+    <key name="button2-press" type="s">
+      <default>'shell:overview'</default>
+      <summary>Action when button 2 is pressed</summary>
+    </key>
+    <key name="button2-hold" type="s">
+      <default>''</default>
+      <summary>Action when button 2 is held</summary>
+    </key>
+    <key name="hold-time" type="i">
+      <range min="250" max="2000"/>
+      <default>500</default>
+      <summary>How long a press must last to count as a hold, in milliseconds</summary>
+    </key>
+    <key name="last-press" type="s">
+      <default>''</default>
+      <summary>Last button press, as "button1 press &lt;time&gt;"; lets the settings show which button is which</summary>
+    </key>
+  </schema>
+</schemalist>
