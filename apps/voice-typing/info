@@ -1,5 +1,5 @@
 NAME=Voice Typing
-SUMMARY=Offline speech-to-text with whisper.cpp. Adds a microphone key to Tablet Keyboard: hold to talk, or tap to start and stop.
+SUMMARY=Offline speech-to-text with Whisper (English) or Parakeet (25 European languages). Adds a microphone key to Tablet Keyboard: hold to talk, or tap to start and stop.
 ICON=audio-input-microphone-symbolic
 WEBSITE=https://github.com/ggml-org/whisper.cpp
 SETUP_LABEL=Try It

@@ -189,7 +189,8 @@
   icon-size: 20px;
 }
 
-/* Voice typing: red while recording, dimmed while transcribing */
+/* Voice typing: red while recording, dimmed while transcribing or
+ * downloading a model */
 .tk-key.tk-voice.tk-recording,
 .tk-dark .tk-key.tk-voice.tk-recording {
   background-color: #ff3b30;
@@ -199,6 +200,7 @@
   color: #ffffff;
 }
 
-.tk-key.tk-voice.tk-transcribing .tk-icon {
+.tk-key.tk-voice.tk-transcribing .tk-icon,
+.tk-key.tk-voice.tk-downloading .tk-icon {
   color: #8a8a8e;
 }

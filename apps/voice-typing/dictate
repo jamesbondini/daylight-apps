@@ -1,11 +1,44 @@
 #!/bin/bash
-# Record from the default microphone until a line or end of input arrives on
-# stdin, then print the transcription. Tablet Keyboard's microphone key runs
-# this and types the output; SIGTERM cancels without output.
+# Voice typing helper used by Tablet Keyboard's microphone key.
+#
+#   dictate [whisper|parakeet]   Record from the default microphone until a
+#                                line or end of input arrives on stdin, then
+#                                print the transcription. SIGTERM cancels.
+#   dictate --download ENGINE    Download the engine's model.
 set -u
 
-DIR="$(dirname "$(readlink -f "$0")")"
-MODEL="$DIR/ggml-base.en.bin"
+MODELS="${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing"
+
+# Model files; keep in sync with MODELS in tablet-keyboard@finni/voice.js
+model_file() {
+  case "$1" in
+    whisper)  echo ggml-base.en.bin ;;
+    parakeet) echo ggml-parakeet-tdt-0.6b-v3-q4_k.bin ;;
+    *) echo "unknown engine: $1" >&2; return 1 ;;
+  esac
+}
+model_url() {
+  case "$1" in
+    whisper)  echo "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$(model_file "$1")" ;;
+    parakeet) echo "https://huggingface.co/ggml-org/parakeet-GGUF/resolve/main/$(model_file "$1")" ;;
+  esac
+}
+
+if [ "${1:-}" = --download ]; then
+  engine="${2:-whisper}"
+  file="$(model_file "$engine")" || exit 2
+  [ -s "$MODELS/$file" ] && exit 0
+  mkdir -p "$MODELS"
+  # -C - resumes an interrupted download
+  curl -fL -C - --progress-bar -o "$MODELS/$file.part" "$(model_url "$engine")" || exit 1
+  mv "$MODELS/$file.part" "$MODELS/$file"
+  exit 0
+fi
+
+ENGINE="${1:-whisper}"
+MODEL="$MODELS/$(model_file "$ENGINE")" || exit 2
+[ -s "$MODEL" ] || { echo "model missing: $MODEL" >&2; exit 3; }
+
 TMP="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/dictate-XXXXXX")"
 WAV="$TMP/speech.wav"
 rec= job=
@@ -26,9 +59,15 @@ kill -INT "$rec" 2>/dev/null
 wait "$rec"
 rec=
 
-whisper-cli -m "$MODEL" -f "$WAV" -l en -t 4 -nt -np 2>/dev/null >"$TMP/text" &
+case "$ENGINE" in
+  whisper)  whisper-cli -m "$MODEL" -f "$WAV" -l en -t 4 -nt -np ;;
+  parakeet) parakeet-cli -m "$MODEL" -f "$WAV" -t 4 -np ;;
+esac 2>/dev/null >"$TMP/text" &
 job=$!
 wait "$job" || exit 1
 
-# One line, without non-speech tags like [BLANK_AUDIO] or (wind blowing)
-sed -E 's/\[[^]]*\]//g; s/\([^)]*\)//g' "$TMP/text" | tr -s ' \n' ' ' | sed -E 's/^ +| +$//g'
+# Whisper marks non-speech with tags like [BLANK_AUDIO] or (wind blowing)
+tags='s/\[[^]]*\]//g; s/\([^)]*\)//g'
+[ "$ENGINE" = whisper ] || tags=
+# One line
+sed -E "$tags" "$TMP/text" | tr -s ' \n' ' ' | sed -E 's/^ +| +$//g'

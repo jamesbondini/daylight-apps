@@ -480,6 +480,8 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             'changed::swipe-symbols', () => this._rebuildPages(),
             'changed::shortcut-bar', () => this._syncToolbar(),
             'changed::auto-capitalize', () => this._updateAutoShift(),
+            'changed::voice-engine', () =>
+                this._dictation?.setEngine(this._settings.get_string('voice-engine')),
             this);
         this._syncColorScheme();
     }
@@ -532,6 +534,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._preview = new KeyPreview();
 
         this._dictation = new Dictation({
+            engine: this._settings.get_string('voice-engine'),
             onChanged: () => this._syncVoice(),
             onText: text => this._typeDictation(text),
         });
@@ -1741,14 +1744,16 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         for (const key of this._grid.keys) {
             if (key.spec.kind !== 'voice')
                 continue;
-            for (const s of ['recording', 'transcribing']) {
+            for (const s of ['downloading', 'recording', 'transcribing']) {
                 if (state === s)
                     key.add_style_class_name(`tk-${s}`);
                 else
                     key.remove_style_class_name(`tk-${s}`);
             }
-            key.setIcon(state === 'transcribing'
-                ? 'content-loading-symbolic' : 'audio-input-microphone-symbolic');
+            key.setIcon({
+                downloading: 'folder-download-symbolic',
+                transcribing: 'content-loading-symbolic',
+            }[state] ?? 'audio-input-microphone-symbolic');
         }
     }
 

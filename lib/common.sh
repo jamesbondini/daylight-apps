@@ -109,3 +109,10 @@ gnome_ext_enabled() {
     *) return 1 ;;
   esac
 }
+
+# Voice typing engine picked in the Tablet Keyboard settings (whisper or parakeet)
+voice_engine() {
+  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@finni/schemas"
+  gsettings --schemadir "$schemas" get org.gnome.shell.extensions.tablet-keyboard voice-engine \
+    2>/dev/null | tr -d "'" | grep -x 'whisper\|parakeet' || echo whisper
+}

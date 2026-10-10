@@ -1,10 +1,15 @@
 import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk';
 
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 const SCHEMES = ['system', 'light', 'dark'];
+const ENGINES = ['whisper', 'parakeet'];
+// Installed by the Daylight Apps "Voice Typing" app
+const VOICE_HELPER = GLib.build_filenamev(
+    [GLib.get_user_data_dir(), 'daylight-apps', 'voice-typing', 'dictate']);
 
 export default class TabletKeyboardPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
@@ -52,5 +57,20 @@ export default class TabletKeyboardPreferences extends ExtensionPreferences {
             'Tap space twice to type a period and a space');
         switchRow(typing, 'autocorrect', 'Small autocorrections',
             'i → I, dont → don’t, teh → the. Backspace right after a fix undoes it');
+
+        if (GLib.file_test(VOICE_HELPER, GLib.FileTest.IS_EXECUTABLE)) {
+            const voice = new Adw.PreferencesGroup({title: 'Voice typing'});
+            page.add(voice);
+            const engine = new Adw.ComboRow({
+                title: 'Engine',
+                subtitle: 'Whisper: English, 142 MB. Parakeet: 25 European languages, ' +
+                    'detected automatically, 416 MB, downloads when first picked',
+                model: Gtk.StringList.new(['Whisper', 'Parakeet']),
+                selected: Math.max(0, ENGINES.indexOf(settings.get_string('voice-engine'))),
+            });
+            engine.connect('notify::selected',
+                () => settings.set_string('voice-engine', ENGINES[engine.selected]));
+            voice.add(engine);
+        }
     }
 }

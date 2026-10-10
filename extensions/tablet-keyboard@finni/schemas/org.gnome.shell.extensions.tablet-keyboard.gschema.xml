@@ -45,5 +45,13 @@
       <default>'system'</default>
       <summary>Light or dark keys</summary>
     </key>
+    <key name="voice-engine" type="s">
+      <choices>
+        <choice value="whisper"/>
+        <choice value="parakeet"/>
+      </choices>
+      <default>'whisper'</default>
+      <summary>Speech recognition engine for the microphone key</summary>
+    </key>
   </schema>
 </schemalist>

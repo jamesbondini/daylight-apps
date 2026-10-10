@@ -1,9 +1,9 @@
 #!/bin/bash
-# Remove the dictate helper, the model and whisper.cpp.
+# Remove the dictate helper, the downloaded models and whisper.cpp.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
 DEST="$HOME/.local/share/daylight-apps/voice-typing"
-step "Removing the helper and model"
+step "Removing the helper and models"
 # Helper first, so the keyboard hides its microphone key straight away
 rm -f "$DEST/dictate"
 rm -rf "$DEST"
