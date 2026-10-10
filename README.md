@@ -58,10 +58,12 @@ Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
 - `installed`: exit 0 when installed; first line of stdout is shown as status
 - `remove`: uninstalls
 - `setup` (optional): post-install step. Call `require_terminal "$0"` if it needs keyboard input.
+- `enabled`, `enable`, `disable` (optional, together): exit 0 when turned on, turn on, turn off.
+  These add an on/off switch to the app's row and page; the GNOME Shell extensions use them.
 
 Scripts source `lib/common.sh` for `step`, `info`, `fail`, `as_root` (one polkit prompt per
 call), `apk_present`, `apk_add_cmd`/`apk_del_cmd`, `flatpak_install_app`/`flatpak_status`/
-`flatpak_remove_app`, `gnome_ext_set_enabled`, `in_terminal` and `require_terminal`.
+`flatpak_remove_app`, `gnome_ext_set_enabled`, `gnome_ext_enabled`, `in_terminal` and `require_terminal`.
 A Flathub app needs only three one-line scripts; see `apps/localsend/`.
 Every script also works directly from a terminal, e.g. `apps/tailscale/install`.
 URLs printed by a script become clickable buttons in the app.

@@ -9,6 +9,8 @@ scripts):
   installed  exit 0 if installed, printing a one-line status
   remove     uninstall the app
   setup      optional post-install step (login, account linking, ...)
+  enabled    optional: exit 0 if turned on; with `enable` and `disable`
+             this adds an on/off switch (e.g. for GNOME Shell extensions)
 """
 
 import os
@@ -43,10 +45,16 @@ class AppEntry:
         self.summary = self.meta.get("SUMMARY", "")
         self.installed = None  # None = unknown
         self.status = ""
+        self.enabled = None  # None = unknown or not switchable
+        self.toggling = False
 
     def script(self, name):
         p = self.path / name
         return p if p.exists() and os.access(p, os.X_OK) else None
+
+    @property
+    def switchable(self):
+        return all(self.script(s) for s in ("enabled", "enable", "disable"))
 
     def icon_name(self, widget):
         theme = Gtk.IconTheme.get_for_display(widget.get_display())
@@ -85,9 +93,30 @@ def check_installed(app, callback):
             app.status = (out or "").strip().splitlines()[0] if (out or "").strip() else ""
         except GLib.Error:
             app.installed, app.status = False, ""
-        callback(app)
+        if app.installed and app.switchable:
+            check_enabled(app, callback)
+        else:
+            app.enabled = None
+            callback(app)
 
     proc.communicate_utf8_async(None, None, done)
+
+
+def check_enabled(app, callback):
+    """Run the app's `enabled` script asynchronously."""
+    launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE)
+    launcher.set_environ(script_env())
+    proc = launcher.spawnv([str(app.path / "enabled")])
+
+    def done(proc, res):
+        try:
+            proc.wait_finish(res)
+            app.enabled = proc.get_successful()
+        except GLib.Error:
+            app.enabled = None
+        callback(app)
+
+    proc.wait_async(None, done)
 
 
 class AppPage(Adw.NavigationPage):
@@ -130,6 +159,13 @@ class AppPage(Adw.NavigationPage):
             link = Gtk.LinkButton(uri=site, label=site.split("://", 1)[-1], halign=Gtk.Align.START)
             link.add_css_class("flat")
             box.append(link)
+
+        # On/off switch for apps that have one
+        self.switch_group = Adw.PreferencesGroup(visible=False)
+        self.switch_row = Adw.SwitchRow(title="Turned On")
+        self.switch_row.connect("notify::active", self.on_switch)
+        self.switch_group.add(self.switch_row)
+        box.append(self.switch_group)
 
         # Action buttons
         self.actions = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, column_spacing=8,
@@ -185,9 +221,17 @@ class AppPage(Adw.NavigationPage):
         else:
             self.status_label.set_label("Not installed")
 
+        running = self.proc is not None
+        self.switch_group.set_visible(bool(app.installed) and app.enabled is not None)
+        if app.enabled is not None and not app.toggling:
+            self.syncing = True
+            self.switch_row.set_active(app.enabled)
+            self.syncing = False
+        self.switch_row.set_sensitive(not running and not app.toggling)
+        self.switch_row.set_subtitle("Switching…" if app.toggling else app.status)
+
         while child := self.actions.get_first_child():
             self.actions.remove(child)
-        running = self.proc is not None
         self.actions.set_visible(not running and app.installed is not None)
         self.busy.set_visible(running)
         if running or app.installed is None:
@@ -212,6 +256,10 @@ class AppPage(Adw.NavigationPage):
         add("Remove", self.confirm_remove, "destructive-action")
 
     # ---- actions ----
+
+    def on_switch(self, row, _pspec):
+        if not getattr(self, "syncing", False) and row.get_active() != self.app.enabled:
+            self.window.toggle(self.app, row.get_active())
 
     def open_app(self):
         target = self.app.meta["OPEN"]
@@ -337,10 +385,14 @@ class Window(Adw.ApplicationWindow):
             badge = Gtk.Label(valign=Gtk.Align.CENTER)
             badge.add_css_class("caption")
             row.add_suffix(badge)
+            switch = Gtk.Switch(valign=Gtk.Align.CENTER, visible=False,
+                                tooltip_text=f"Turn {app.name} on or off")
+            switch.connect("notify::active", self.on_row_switch, app)
+            row.add_suffix(switch)
             row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
             row.connect("activated", lambda _, a=app: self.show_app(a))
             group.add(row)
-            self.rows[app.id] = (row, icon, badge)
+            self.rows[app.id] = (row, icon, badge, switch)
         if not self.apps:
             page = Adw.StatusPage(title="No Apps", description=f"Add app recipes to {APP_DIRS[-1]}",
                                   icon_name="system-software-install-symbolic")
@@ -363,10 +415,16 @@ class Window(Adw.ApplicationWindow):
                 check_installed(app, self.on_status)
 
     def on_status(self, app):
-        row, icon, badge = self.rows[app.id]
+        row, icon, badge, switch = self.rows[app.id]
         icon.set_from_icon_name(app.icon_name(self))
         page = self.pages.get(app.id)
         busy = bool(page and page.proc)
+        switch.set_visible(bool(app.installed) and app.enabled is not None and not busy)
+        if app.enabled is not None and not app.toggling:
+            self.syncing = True
+            switch.set_active(app.enabled)
+            self.syncing = False
+        switch.set_sensitive(not app.toggling)
         for cls in ("success", "dim-label", "accent"):
             badge.remove_css_class(cls)
         if busy:
@@ -379,6 +437,44 @@ class Window(Adw.ApplicationWindow):
             badge.set_label("")
         if page:
             page.update()
+
+    def on_row_switch(self, switch, _pspec, app):
+        if not getattr(self, "syncing", False) and switch.get_active() != app.enabled:
+            self.toggle(app, switch.get_active())
+
+    def toggle(self, app, on):
+        """Run the app's `enable` or `disable` script; toast its last line."""
+        page = self.pages.get(app.id)
+        if app.toggling or (page and page.proc):
+            return
+        app.toggling = True
+        self.on_status(app)
+        launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_MERGE)
+        launcher.set_environ(script_env())
+        launcher.set_cwd(str(app.path))
+        try:
+            proc = launcher.spawnv([str(app.path / ("enable" if on else "disable"))])
+        except GLib.Error as e:
+            app.toggling = False
+            self.toast(f"Could not start: {e.message}")
+            check_installed(app, self.on_status)
+            return
+
+        def done(proc, res):
+            try:
+                _, out, _ = proc.communicate_utf8_finish(res)
+            except GLib.Error:
+                out = ""
+            lines = [ANSI_RE.sub("", l).strip() for l in (out or "").splitlines()]
+            lines = [l for l in lines if l and not l.startswith("==>")]
+            if proc.get_successful():
+                self.toast(f"{app.name}: {lines[-1]}" if lines else f"{app.name} turned {'on' if on else 'off'}")
+            else:
+                self.toast(f"Could not turn {app.name} {'on' if on else 'off'}" + (f": {lines[-1]}" if lines else ""))
+            app.toggling = False
+            check_installed(app, self.on_status)
+
+        proc.communicate_utf8_async(None, None, done)
 
     def toast(self, text):
         self.toasts.add_toast(Adw.Toast(title=text, timeout=4))

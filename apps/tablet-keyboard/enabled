@@ -1,0 +1,4 @@
+#!/bin/bash
+# Exit 0 if the extension is turned on.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+gnome_ext_enabled tablet-keyboard@finni

@@ -99,3 +99,13 @@ PY
     gsettings set org.gnome.shell disable-user-extensions false
   fi
 }
+
+# Exit 0 if a GNOME Shell extension is in the enabled-extensions list (it may
+# only become active after logging out and in, if installed this session).
+gnome_ext_enabled() {
+  [ "$(gsettings get org.gnome.shell disable-user-extensions)" = false ] || return 1
+  case "$(gsettings get org.gnome.shell enabled-extensions)" in
+    *"'$1'"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
