@@ -301,7 +301,7 @@
 
 .tk-mono-dark .tk-key {
   color: #ffffff;
-  border: 2px solid #ffffff;
+  border: 2px solid #777777;
   box-shadow: none;
 }
 
@@ -361,7 +361,7 @@
 .tk-mono-dark .tk-trackpad .tk-key,
 .tk-mono-dark .tk-trackpad .tk-key:active {
   background-color: #111111;
-  border-color: #666666;
+  border-color: #4d4d4d;
 }
 
 .tk-mono-dark .tk-tool {
@@ -379,7 +379,7 @@
 .tk-accents.tk-mono-dark {
   background-color: #000000;
   color: #ffffff;
-  border: 2px solid #ffffff;
+  border: 2px solid #777777;
   box-shadow: none;
 }
 
