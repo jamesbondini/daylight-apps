@@ -54,5 +54,9 @@
       <default>'whisper'</default>
       <summary>Speech recognition engine for the microphone key</summary>
     </key>
+    <key name="voice-words" type="as">
+      <default>[]</default>
+      <summary>Dictionary for voice typing: "Word", or "Word = misheard, other misheard"</summary>
+    </key>
   </schema>
 </schemalist>

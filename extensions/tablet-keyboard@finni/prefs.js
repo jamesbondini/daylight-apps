@@ -72,6 +72,68 @@ export default class TabletKeyboardPreferences extends ExtensionPreferences {
             engine.connect('notify::selected',
                 () => settings.set_string('voice-engine', ENGINES[engine.selected]));
             voice.add(engine);
+
+            page.add(this._dictionaryGroup(settings));
         }
+    }
+
+    // Words voice typing should know, like names and jargon. An entry is
+    // "Word" or "Word = misheard, other misheard"; see apps/voice-typing/dictate
+    _dictionaryGroup(settings) {
+        const group = new Adw.PreferencesGroup({
+            title: 'Voice dictionary',
+            description: 'Names and special words voice typing should know and ' +
+                'spell your way. If a word keeps coming out wrong, add what it ' +
+                'is heard as after an equals sign: Finni = finny, funny',
+        });
+
+        const add = new Adw.EntryRow({title: 'Add a word', show_apply_button: true});
+        add.connect('apply', () => {
+            const [word, ...heard] = add.text.split('=');
+            const entry = heard.length
+                ? `${word.trim()} = ${heard.join('=').split(',').map(h => h.trim()).filter(h => h).join(', ')}`
+                : word.trim();
+            add.text = '';
+            if (!word.trim())
+                return;
+            const words = settings.get_strv('voice-words');
+            // A new entry for a word replaces its old one
+            const key = word.trim().toLowerCase();
+            settings.set_strv('voice-words', [
+                ...words.filter(w => w.split('=')[0].trim().toLowerCase() !== key),
+                entry,
+            ]);
+        });
+        group.add(add);
+
+        let rows = [];
+        const sync = () => {
+            rows.forEach(row => group.remove(row));
+            const words = settings.get_strv('voice-words');
+            rows = words.map((entry, i) => {
+                const [word, ...heard] = entry.split('=');
+                const row = new Adw.ActionRow({
+                    title: GLib.markup_escape_text(word.trim(), -1),
+                    subtitle: heard.length
+                        ? GLib.markup_escape_text(`Heard as ${heard.join('=').trim()}`, -1)
+                        : '',
+                });
+                const remove = new Gtk.Button({
+                    icon_name: 'user-trash-symbolic',
+                    tooltip_text: 'Remove',
+                    valign: Gtk.Align.CENTER,
+                    css_classes: ['flat'],
+                });
+                remove.connect('clicked', () => settings.set_strv('voice-words',
+                    words.filter((_, j) => j !== i)));
+                row.add_suffix(remove);
+                group.add(row);
+                return row;
+            });
+        };
+        const id = settings.connect('changed::voice-words', sync);
+        group.connect('destroy', () => settings.disconnect(id));
+        sync();
+        return group;
     }
 }

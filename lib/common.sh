@@ -127,3 +127,19 @@ voice_engine() {
   gsettings --schemadir "$schemas" get org.gnome.shell.extensions.tablet-keyboard voice-engine \
     2>/dev/null | tr -d "'" | grep -x 'whisper\|parakeet' || echo whisper
 }
+
+# The voice dictionary from the keyboard settings, one entry per line
+voice_words() {
+  python3 -I -c '
+import gi
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio
+import sys
+src = Gio.SettingsSchemaSource.new_from_directory(sys.argv[1],
+    Gio.SettingsSchemaSource.get_default(), False)
+schema = src.lookup("org.gnome.shell.extensions.tablet-keyboard", False)
+if schema and schema.has_key("voice-words"):
+    for w in Gio.Settings.new_full(schema, None, None).get_strv("voice-words"):
+        print(w)
+' "$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@finni/schemas" 2>/dev/null
+}

@@ -1,9 +1,14 @@
 #!/bin/bash
 # Voice typing helper used by Tablet Keyboard's microphone key.
 #
-#   dictate [whisper|parakeet]   Record from the default microphone until a
+#   dictate [ENGINE [WORD...]]   Record from the default microphone until a
 #                                line or end of input arrives on stdin, then
 #                                print the transcription. SIGTERM cancels.
+#                                ENGINE is whisper or parakeet. Each WORD is a
+#                                dictionary entry, "Word" or "Word = misheard,
+#                                other misheard": Whisper is prompted with the
+#                                words, and with both engines any match is
+#                                fixed to the word's spelling.
 #   dictate --download ENGINE    Download the engine's model.
 #   dictate --path ENGINE        Print where the engine's model goes.
 set -u
@@ -48,6 +53,8 @@ if [ "${1:-}" = --download ]; then
 fi
 
 ENGINE="${1:-whisper}"
+shift $(( $# > 0 ))
+WORDS=("$@")
 MODEL="$MODELS/$(model_file "$ENGINE")" || exit 2
 [ -s "$MODEL" ] || { echo "model missing: $MODEL" >&2; exit 3; }
 
@@ -80,6 +87,12 @@ case "$ENGINE" in
   whisper)  cmd=(whisper-cli -m "$MODEL" -f "$WAV" -l en -t 4 -nt -np) ;;
   parakeet) cmd=(parakeet-cli -m "$MODEL" -f "$WAV" -t 4 -np) ;;
 esac
+# Whisper continues from the prompt as if it were earlier speech, so a list
+# of the words makes it spell them that way
+if [ "$ENGINE" = whisper ] && [ ${#WORDS[@]} -gt 0 ]; then
+  prompt=$(printf '%s\n' "${WORDS[@]}" | sed -E 's/=.*//; s/^ +| +$//g; /^$/d' | paste -sd ',' | sed 's/,/, /g')
+  [ -n "$prompt" ] && cmd+=(--prompt "$prompt.")
+fi
 "${cmd[@]}" 2>/dev/null >"$TMP/text" &
 job=$!
 wait "$job" || exit 1
@@ -87,5 +100,23 @@ wait "$job" || exit 1
 # Whisper marks non-speech with tags like [BLANK_AUDIO] or (wind blowing)
 tags='s/\[[^]]*\]//g; s/\([^)]*\)//g'
 [ "$ENGINE" = whisper ] || tags=
-# One line
-sed -E "$tags" "$TMP/text" | tr -s ' \n' ' ' | sed -E 's/^ +| +$//g'
+# One line, with dictionary words spelled the way they were added
+spell() {
+  if [ ${#WORDS[@]} -eq 0 ]; then cat; return; fi
+  python3 -I -c '
+import re, sys
+text = sys.stdin.read()
+for entry in sys.argv[1:]:
+    word, _, heard = entry.partition("=")
+    word = word.strip()
+    if not word:
+        continue
+    forms = [word] + [h.strip() for h in heard.split(",")]
+    forms = sorted({f for f in forms if f}, key=len, reverse=True)
+    # Words of a phrase may come out joined by a hyphen too
+    alts = "|".join(r"[\s-]+".join(map(re.escape, f.split())) for f in forms)
+    text = re.sub(rf"(?<!\w)(?:{alts})(?!\w)", lambda m: word, text, flags=re.I)
+print(text, end="")
+' "${WORDS[@]}"
+}
+sed -E "$tags" "$TMP/text" | tr -s ' \n' ' ' | sed -E 's/^ +| +$//g' | spell

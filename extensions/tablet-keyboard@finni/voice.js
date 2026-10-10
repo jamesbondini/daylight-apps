@@ -79,9 +79,11 @@ function download(engine) {
 }
 
 export class Dictation {
-    // onChanged(): availability or state changed; onText(text): a transcription
-    constructor({engine, onChanged, onText}) {
+    // onChanged(): availability or state changed; onText(text): a transcription;
+    // words(): the dictionary entries, read at the start of each recording
+    constructor({engine, words, onChanged, onText}) {
         this._engine = engine;
+        this._words = words;
         this._onChanged = onChanged;
         this._onText = onText;
         this._proc = null;
@@ -165,7 +167,7 @@ export class Dictation {
 
         let proc;
         try {
-            proc = Gio.Subprocess.new([HELPER, this._engine],
+            proc = Gio.Subprocess.new([HELPER, this._engine, ...this._words()],
                 Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE |
                 Gio.SubprocessFlags.STDERR_SILENCE);
         } catch (e) {

@@ -659,6 +659,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
         this._dictation = new Dictation({
             engine: this._settings.get_string('voice-engine'),
+            words: () => this._settings.get_strv('voice-words'),
             onChanged: () => this._syncVoice(),
             onText: text => this._typeDictation(text),
         });
