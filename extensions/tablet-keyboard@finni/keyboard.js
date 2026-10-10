@@ -57,6 +57,73 @@ function centerPivot() {
     return new Graphene.Point({x: 0.5, y: 0.5});
 }
 
+// Height profile of the voice key's level bars, tallest in the middle
+const VOICE_BARS = [0.45, 0.75, 1, 0.75, 0.45];
+const VOICE_LEVEL_MS = 60;
+
+// Bars inside the mic key: they follow the microphone while recording and
+// run a wave while transcribing
+const VoiceMeter = GObject.registerClass(
+class TabletVoiceMeter extends St.BoxLayout {
+    _init() {
+        super._init({style_class: 'tk-voice-bars', visible: false});
+        this._level = 0;
+        this._bars = VOICE_BARS.map(() => {
+            const bar = new St.Widget({
+                style_class: 'tk-voice-bar',
+                y_align: Clutter.ActorAlign.CENTER,
+                pivot_point: centerPivot(),
+                scale_y: 0.2,
+            });
+            this.add_child(bar);
+            return bar;
+        });
+    }
+
+    setSize(height) {
+        const width = Math.max(2, Math.round(height / 7));
+        this.style = `spacing: ${Math.round(width * 0.8)}px;`;
+        for (const bar of this._bars)
+            bar.style = `width: ${width}px; height: ${height}px; border-radius: ${width / 2}px;`;
+    }
+
+    // level from 0 to 1, or null when unknown
+    setLevel(level) {
+        // Rise at once, fall gently
+        this._level = Math.max(level ?? 0, this._level * 0.75);
+        this._bars.forEach((bar, i) => {
+            const jitter = 0.7 + Math.random() * 0.3;
+            bar.ease({
+                scale_y: Math.max(0.2, this._level * VOICE_BARS[i] * jitter),
+                duration: VOICE_LEVEL_MS,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        });
+    }
+
+    startWave() {
+        this.reset();
+        this._bars.forEach((bar, i) => {
+            bar.ease({
+                scale_y: 0.8,
+                delay: i * 110,
+                duration: 440,
+                mode: Clutter.AnimationMode.EASE_IN_OUT_SINE,
+                repeatCount: -1,
+                autoReverse: true,
+            });
+        });
+    }
+
+    reset() {
+        this._level = 0;
+        for (const bar of this._bars) {
+            bar.remove_all_transitions();
+            bar.scale_y = 0.2;
+        }
+    }
+});
+
 const KeyActor = GObject.registerClass(
 class TabletKeyActor extends St.Widget {
     _init(spec) {
@@ -75,6 +142,10 @@ class TabletKeyActor extends St.Widget {
                 icon_name: spec.icon,
             });
             this.add_child(this._icon);
+            if (spec.kind === 'voice') {
+                this._meter = new VoiceMeter();
+                this.add_child(this._meter);
+            }
         } else if (spec.kind !== 'space') {
             this._label = new St.Label({
                 style_class: spec.kind === 'char' ? 'tk-label' : 'tk-fn-label',
@@ -114,7 +185,8 @@ class TabletKeyActor extends St.Widget {
             this._icon.icon_name = iconName;
     }
 
-    // The mic key beats while recording and breathes while busy
+    // The mic key shows the microphone level while recording, a wave while
+    // transcribing and a breathing download icon while fetching a model
     setVoiceState(state) {
         if (state === this._voiceState)
             return;
@@ -126,24 +198,32 @@ class TabletKeyActor extends St.Widget {
             else
                 this.remove_style_class_name(`tk-${s}`);
         }
-        this.setIcon({
-            downloading: 'folder-download-symbolic',
-            transcribing: 'content-loading-symbolic',
-        }[state] ?? 'audio-input-microphone-symbolic');
+        this.setIcon(state === 'downloading'
+            ? 'folder-download-symbolic' : 'audio-input-microphone-symbolic');
 
-        const icon = this._icon;
-        icon.remove_all_transitions();
-        icon.set({pivot_point: centerPivot(), scale_x: 1, scale_y: 1, opacity: 255});
-        const pulse = {
-            duration: 650,
-            mode: Clutter.AnimationMode.EASE_IN_OUT_SINE,
-            repeatCount: -1,
-            autoReverse: true,
-        };
-        if (state === 'recording')
-            icon.ease({...pulse, scale_x: 1.2, scale_y: 1.2});
-        else if (state !== 'idle')
-            icon.ease({...pulse, opacity: 90});
+        const busy = state === 'recording' || state === 'transcribing';
+        this._icon.visible = !busy;
+        this._meter.visible = busy;
+        if (state === 'transcribing')
+            this._meter.startWave();
+        else
+            this._meter.reset();
+
+        this._icon.remove_all_transitions();
+        this._icon.opacity = 255;
+        if (state === 'downloading') {
+            this._icon.ease({
+                opacity: 90,
+                duration: 650,
+                mode: Clutter.AnimationMode.EASE_IN_OUT_SINE,
+                repeatCount: -1,
+                autoReverse: true,
+            });
+        }
+    }
+
+    setVoiceLevel(level) {
+        this._meter?.setLevel(level);
     }
 
     applyMetrics(m) {
@@ -157,6 +237,7 @@ class TabletKeyActor extends St.Widget {
         }
         if (this._icon)
             this._icon.icon_size = m.icon;
+        this._meter?.setSize(m.icon);
     }
 
     vfunc_allocate(box) {
@@ -176,6 +257,8 @@ class TabletKeyActor extends St.Widget {
 
         if (this._icon)
             place(this._icon, height / 2);
+        if (this._meter)
+            place(this._meter, height / 2);
         if (this._alt) {
             // Small swipe-down character on top, main one a bit lower
             const [, , , altH] = this._alt.get_preferred_size();
@@ -495,162 +578,6 @@ class TabletAccentPopup extends St.BoxLayout {
     }
 });
 
-// Height profile of the level bars, tallest in the middle
-const VOICE_BARS = [0.45, 0.7, 0.9, 1, 0.9, 0.7, 0.45];
-const VOICE_LEVEL_MS = 60;
-
-// A pill floating above the keyboard while voice typing: a pulsing red dot
-// and bars following the microphone while recording, a wave through the
-// bars while transcribing or downloading a model
-const VoiceHud = GObject.registerClass(
-class TabletVoiceHud extends St.BoxLayout {
-    _init() {
-        super._init({style_class: 'tk-voice-hud', visible: false, opacity: 0});
-
-        this._dot = new St.Widget({
-            style_class: 'tk-voice-dot',
-            y_align: Clutter.ActorAlign.CENTER,
-            pivot_point: centerPivot(),
-        });
-        this.add_child(this._dot);
-
-        const bars = new St.BoxLayout({
-            style_class: 'tk-voice-bars',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        this._bars = VOICE_BARS.map(() => {
-            const bar = new St.Widget({
-                style_class: 'tk-voice-bar',
-                y_align: Clutter.ActorAlign.CENTER,
-                pivot_point: centerPivot(),
-                scale_y: 0.2,
-            });
-            bars.add_child(bar);
-            return bar;
-        });
-        this.add_child(bars);
-
-        this._label = new St.Label({
-            style_class: 'tk-voice-label',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        this.add_child(this._label);
-
-        this._state = 'idle';
-        this._level = 0;
-        Main.layoutManager.uiGroup.add_child(this);
-        this.connect('destroy', () => this._stopLevels());
-    }
-
-    // getLevel() gives the microphone level, 0 to 1, or null if unknown
-    setState(state, {label, getLevel, above, dark}) {
-        if (state === this._state) {
-            this._label.text = label ?? '';
-            return;
-        }
-        this._state = state;
-        this._stopLevels();
-        this._dot.remove_all_transitions();
-        this._bars.forEach(bar => bar.remove_all_transitions());
-
-        if (state === 'idle') {
-            this.remove_all_transitions();
-            this.ease({
-                opacity: 0,
-                duration: 150,
-                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete: () => this.hide(),
-            });
-            return;
-        }
-
-        this._label.text = label ?? '';
-        if (dark)
-            this.add_style_class_name('tk-dark');
-        else
-            this.remove_style_class_name('tk-dark');
-
-        if (state === 'recording')
-            this.remove_style_class_name('tk-busy');
-        else
-            this.add_style_class_name('tk-busy');
-        if (state === 'recording')
-            this._startRecording(getLevel);
-        else
-            this._startWave(state === 'downloading' ? 700 : 420);
-
-        // Centred just above the keyboard
-        const monitor = Main.layoutManager.keyboardMonitor;
-        const [, top] = above.get_transformed_position();
-        const [width, height] = this.get_preferred_size().slice(2);
-        this.set_position(
-            Math.round(monitor.x + (monitor.width - width) / 2),
-            Math.round(top - height - 12));
-        Main.layoutManager.uiGroup.set_child_above_sibling(this, null);
-        if (!this.visible || this.opacity < 255) {
-            this.show();
-            this.remove_all_transitions();
-            this.ease({
-                opacity: 255,
-                duration: 150,
-                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            });
-        }
-    }
-
-    _startRecording(getLevel) {
-        this._dot.show();
-        this._dot.set({scale_x: 1, scale_y: 1, opacity: 255});
-        this._dot.ease({
-            scale_x: 0.7,
-            scale_y: 0.7,
-            opacity: 120,
-            duration: 650,
-            mode: Clutter.AnimationMode.EASE_IN_OUT_SINE,
-            repeatCount: -1,
-            autoReverse: true,
-        });
-
-        this._level = 0;
-        this._levelId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, VOICE_LEVEL_MS, () => {
-            const level = getLevel();
-            // Rise at once, fall gently
-            this._level = Math.max(level ?? 0, this._level * 0.75);
-            this._bars.forEach((bar, i) => {
-                const jitter = 0.7 + Math.random() * 0.3;
-                bar.ease({
-                    scale_y: Math.max(0.2, this._level * VOICE_BARS[i] * jitter),
-                    duration: VOICE_LEVEL_MS,
-                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                });
-            });
-            return GLib.SOURCE_CONTINUE;
-        });
-    }
-
-    _startWave(period) {
-        this._dot.hide();
-        this._bars.forEach((bar, i) => {
-            bar.scale_y = 0.2;
-            bar.ease({
-                scale_y: 0.75,
-                delay: i * period / VOICE_BARS.length,
-                duration: period,
-                mode: Clutter.AnimationMode.EASE_IN_OUT_SINE,
-                repeatCount: -1,
-                autoReverse: true,
-            });
-        });
-    }
-
-    _stopLevels() {
-        if (this._levelId) {
-            GLib.source_remove(this._levelId);
-            this._levelId = 0;
-        }
-    }
-});
-
 export const TabletKeyboard = GObject.registerClass(
 class TabletKeyboard extends KeyboardUI.Keyboard {
     _init() {
@@ -720,7 +647,6 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._currentLayout = this._tkLayout;
 
         this._preview = new KeyPreview();
-        this._voiceHud = new VoiceHud();
 
         this._dictation = new Dictation({
             engine: this._settings.get_string('voice-engine'),
@@ -742,8 +668,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._cancelAllTouches();
         this._preview?.destroy();
         this._preview = null;
-        this._voiceHud?.destroy();
-        this._voiceHud = null;
+        this._stopVoiceLevels();
         this._dictation?.destroy();
         this._dictation = null;
         if (this._surroundingRetryId) {
@@ -1950,22 +1875,29 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
     _syncVoiceKeys() {
         const state = this._dictation?.state ?? 'idle';
-        for (const key of this._grid.keys) {
-            if (key.spec.kind === 'voice')
-                key.setVoiceState(state);
-        }
+        const keys = this._grid.keys.filter(k => k.spec.kind === 'voice');
+        for (const key of keys)
+            key.setVoiceState(state);
 
-        const dictation = this._dictation;
-        this._voiceHud?.setState(state, {
-            label: {
-                recording: 'Listening',
-                transcribing: 'Transcribing…',
-                downloading: `Downloading ${dictation?.engineName} model…`,
-            }[state],
-            getLevel: () => dictation?.level() ?? null,
-            above: this._tkLayout,
-            dark: this._dark,
-        });
+        if (state !== 'recording') {
+            this._stopVoiceLevels();
+        } else if (!this._voiceLevelId) {
+            this._voiceLevelId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, VOICE_LEVEL_MS, () => {
+                const level = this._dictation?.level() ?? null;
+                for (const key of this._grid.keys) {
+                    if (key.spec.kind === 'voice')
+                        key.setVoiceLevel(level);
+                }
+                return GLib.SOURCE_CONTINUE;
+            });
+        }
+    }
+
+    _stopVoiceLevels() {
+        if (this._voiceLevelId) {
+            GLib.source_remove(this._voiceLevelId);
+            this._voiceLevelId = 0;
+        }
     }
 
     _endTrackpad(touch) {
