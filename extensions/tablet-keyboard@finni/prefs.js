@@ -41,7 +41,7 @@ export default class TabletKeyboardPreferences extends ExtensionPreferences {
 
         const scheme = new Adw.ComboRow({
             title: 'Theme',
-            subtitle: 'Monochrome is black and white with high contrast, for the Daylight screen',
+            subtitle: 'Monochrome is black and white with high contrast, for the Daylight screen, and inverts with the system dark style',
             model: Gtk.StringList.new(['Monochrome', 'Follow system', 'Light', 'Dark']),
             selected: Math.max(0, SCHEMES.indexOf(settings.get_string('color-scheme'))),
         });

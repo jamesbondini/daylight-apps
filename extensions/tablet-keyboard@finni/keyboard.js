@@ -61,9 +61,11 @@ const VOICE_BARS = [0.45, 0.75, 1, 0.75, 0.45];
 const VOICE_LEVEL_MS = 60;
 
 // Color schemes besides light, which has no class
-const THEME_CLASSES = ['tk-dark', 'tk-mono'];
+const THEME_CLASSES = ['tk-dark', 'tk-mono', 'tk-mono-dark'];
 // Behind the keyboard, matching #keyboard in the stylesheet
-const PANEL_COLORS = {light: '#d1d3d9', dark: '#2b2b2d', mono: '#ffffff'};
+const PANEL_COLORS = {
+    light: '#d1d3d9', dark: '#2b2b2d', mono: '#ffffff', 'mono-dark': '#000000',
+};
 
 // Bars inside the mic key: they follow the microphone while recording and
 // run a wave while transcribing
@@ -693,15 +695,19 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
     _syncColorScheme() {
         let scheme = this._settings.get_string('color-scheme');
+        const systemDark = this._interfaceSettings.get_string('color-scheme') === 'prefer-dark';
         if (scheme === 'system')
-            scheme = this._interfaceSettings.get_string('color-scheme') === 'prefer-dark' ? 'dark' : 'light';
+            scheme = systemDark ? 'dark' : 'light';
+        // Monochrome inverts to white on black with the system dark style
+        else if (scheme === 'mono' && systemDark)
+            scheme = 'mono-dark';
         // Style class for the keyboard and its popups, null for light
         this._theme = scheme === 'light' ? null : `tk-${scheme}`;
         for (const name of THEME_CLASSES)
             this.remove_style_class_name(name);
         if (this._theme)
             this.add_style_class_name(this._theme);
-        if (scheme === 'dark')
+        if (scheme === 'dark' || scheme === 'mono-dark')
             this._bottomPanelBox?.add_style_class_name('dark-mode-enabled');
         else
             this._bottomPanelBox?.remove_style_class_name('dark-mode-enabled');
