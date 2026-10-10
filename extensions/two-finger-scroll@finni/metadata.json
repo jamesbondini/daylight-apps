@@ -1,0 +1,6 @@
+{
+  "uuid": "two-finger-scroll@finni",
+  "name": "Two-Finger Scroll",
+  "description": "Drag two fingers over a terminal window to scroll it, like on a touchpad. Terminals such as Ghostty and Console don't scroll on touch: a one-finger drag selects text.",
+  "shell-version": ["48"]
+}

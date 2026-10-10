@@ -1,0 +1,4 @@
+NAME=Two-Finger Scroll
+SUMMARY=Scroll terminals such as Ghostty and Console by dragging two fingers, like on a touchpad. One finger still selects text.
+ICON=input-touchpad-symbolic
+WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/extensions/two-finger-scroll@finni

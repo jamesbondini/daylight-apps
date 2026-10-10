@@ -1,0 +1,12 @@
+#!/bin/bash
+# Exit 0 if installed; print a one-line status.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+UUID=two-finger-scroll@finni
+[ -f "$HOME/.local/share/gnome-shell/extensions/$UUID/extension.js" ] || exit 1
+state=$(gnome-extensions info "$UUID" 2>/dev/null | awk -F': ' '/State:/ {print $2}' || true)
+case "$state" in
+  ACTIVE)  echo "Active" ;;
+  INACTIVE|DISABLED) echo "Disabled" ;;
+  *)       echo "Log out and back in to activate" ;;
+esac

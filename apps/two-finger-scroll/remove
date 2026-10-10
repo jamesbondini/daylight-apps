@@ -1,0 +1,14 @@
+#!/bin/bash
+# Disable and remove the two-finger-scroll extension.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+UUID=two-finger-scroll@finni
+
+step "Disabling extension"
+gnome_ext_set_enabled "$UUID" false
+
+step "Removing files"
+rm -rf "$HOME/.local/share/gnome-shell/extensions/$UUID"
+
+step "Done"
+info "Two-finger scrolling is off."
