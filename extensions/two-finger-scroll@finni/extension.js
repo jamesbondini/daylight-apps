@@ -38,10 +38,16 @@ const FRAME_MS = 16;
 // click, which selects a word. Keep our click at least this far away.
 const CLICK_CLEARANCE = 64;
 
+function isPointer(device) {
+    return device.device_type === Clutter.InputDeviceType.POINTER_DEVICE ||
+        device.device_type === Clutter.InputDeviceType.TOUCHPAD_DEVICE;
+}
+
 export default class TwoFingerScrollExtension extends Extension {
     enable() {
         const seat = global.stage.context.get_backend().get_default_seat();
         this._pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        this._hideFromKeyboard(seat);
         this._cursorTracker = global.backend.get_cursor_tracker();
         this._lastX = -1;
         this._lastY = -1;
@@ -67,6 +73,32 @@ export default class TwoFingerScrollExtension extends Extension {
                 this._stopMomentum();
             return Clutter.EVENT_PROPAGATE;
         });
+    }
+
+    // Mutter leaves touch mode when a pointer device is plugged in, and the
+    // on-screen keyboard only comes up in touch mode after a touch. Our
+    // virtual pointer would count as both a plugged-in mouse and, after a
+    // scroll, the last device used, so the keyboard would never show.
+    // Virtual devices have no device node; don't count them as pointers.
+    _hideFromKeyboard(seat) {
+        this._seat = seat;
+        seat.get_touch_mode = () => {
+            if (Clutter.Seat.prototype.get_touch_mode.call(seat))
+                return true;
+            const devices = seat.list_devices();
+            return devices.some(d => d.device_type === Clutter.InputDeviceType.TOUCHSCREEN_DEVICE) &&
+                !devices.some(d => isPointer(d) && d.get_device_node() !== null);
+        };
+
+        // Decide on the last real device instead of our virtual one.
+        const keyboard = Main.keyboard;
+        let lastWasTouch = true;
+        keyboard._lastDeviceIsTouchscreen = function () {
+            const device = this._lastDevice;
+            if (device && !(isPointer(device) && device.get_device_node() === null))
+                lastWasTouch = device.device_type === Clutter.InputDeviceType.TOUCHSCREEN_DEVICE;
+            return lastWasTouch;
+        };
     }
 
     _mayRecognize() {
@@ -181,7 +213,12 @@ export default class TwoFingerScrollExtension extends Extension {
         global.stage.disconnect(this._touchId);
         global.stage.remove_action(this._gesture);
         this._gesture = null;
+        // Unplug the virtual pointer now rather than whenever it's collected
+        this._pointer.run_dispose();
         this._pointer = null;
+        delete this._seat.get_touch_mode;
+        this._seat = null;
+        delete Main.keyboard._lastDeviceIsTouchscreen;
         this._cursorTracker = null;
         this._window = null;
     }
