@@ -2,3 +2,4 @@ NAME=Tablet Keyboard
 SUMMARY=iPad-style on-screen keyboard: swipe down for numbers, double-space for a period, hold space to move the cursor, hold letters for accents.
 ICON=input-keyboard-symbolic
 WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/extensions/tablet-keyboard@finni
+CATEGORY=extensions

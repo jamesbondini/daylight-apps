@@ -5,3 +5,4 @@ WEBSITE=https://tailscale.com
 SETUP_LABEL=Log In
 OPEN=https://login.tailscale.com/admin/machines
 OPEN_LABEL=Admin Console
+CATEGORY=services

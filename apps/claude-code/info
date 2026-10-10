@@ -3,3 +3,4 @@ SUMMARY=Anthropic's AI coding agent for the terminal. Native ARM64 build that up
 ICON=utilities-terminal-symbolic
 WEBSITE=https://claude.com/claude-code
 SETUP_LABEL=Open in Terminal
+CATEGORY=developer

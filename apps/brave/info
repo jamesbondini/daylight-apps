@@ -4,3 +4,4 @@ ICON=com.brave.Browser web-browser-symbolic
 WEBSITE=https://brave.com
 OPEN=com.brave.Browser
 OPEN_LABEL=Open
+CATEGORY=apps

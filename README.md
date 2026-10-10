@@ -32,31 +32,59 @@ cd ~/Projects/daylight-apps && git pull
 
 ## Apps
 
-| App       | Installed via                                   | Setup step                                  |
-|-----------|-------------------------------------------------|---------------------------------------------|
-| Maestral  | Python venv in `~/.local/share/maestral-venv` + systemd user service | Link Dropbox account (opens a terminal)     |
-| Tailscale | `apk add tailscale tailscale-systemd` (password prompt) | `tailscale up`; login link shows as a button |
-| 1Password | Flathub `com.onepassword.OnePassword` (user)    | Open the app and sign in                    |
-| LocalSend | Flathub `org.localsend.localsend_app` (user) | None |
-| Obsidian  | Flathub `md.obsidian.Obsidian` (user) | Open the app and pick a vault |
-| Déjà Dup  | Flathub `org.gnome.DejaDup` (user) | Open the app and choose what to back up and where |
-| Signal    | Flathub `org.signal.Signal` (user) | Open the app and link it to your phone |
-| VS Code   | Flathub `com.visualstudio.code` (user) | None |
-| Neovim    | Flathub `io.neovim.nvim` (user) + `nvim` command in `~/.local/bin` | Opens `nvim` in a terminal |
-| Brave     | Flathub `com.brave.Browser` (user) + `/etc/brave/policies/managed/daylight-apps.json` turning off Rewards, Wallet, VPN, Leo, News and telemetry (Brave Origin has no musl build) | None |
+The app shows these in the same groups, set by `CATEGORY=` in each app's `info`.
+
+### Apps
+
+Installed per user from Flathub.
+
+| App       | Flathub id                     | Setup step                                  |
+|-----------|--------------------------------|---------------------------------------------|
+| 1Password | `com.onepassword.OnePassword`  | Open the app and sign in                    |
+| Brave     | `com.brave.Browser`            | None                                        |
+| Déjà Dup  | `org.gnome.DejaDup`            | Open the app and choose what to back up and where |
+| LocalSend | `org.localsend.localsend_app`  | None                                        |
+| Obsidian  | `md.obsidian.Obsidian`         | Open the app and pick a vault               |
+| Signal    | `org.signal.Signal`            | Open the app and link it to your phone      |
+
+Brave also gets `/etc/brave/policies/managed/daylight-apps.json`, turning off Rewards, Wallet,
+VPN, Leo, News and telemetry (Brave Origin has no musl build).
+
+### Developer Tools
+
+| App         | Installed via                                                        | Setup step                              |
+|-------------|----------------------------------------------------------------------|-----------------------------------------|
 | Claude Code | Official native installer (`claude.ai/install.sh`, arm64-musl) + `libgcc libstdc++ ripgrep` | Opens `claude` in a terminal to sign in |
-| Maximize New Windows | Bundled GNOME Shell extension (`extensions/maximize-new-windows@finni`), see [dc-1-pmos#10](https://github.com/denysvitali/dc-1-pmos/issues/10) | None; log out and in if it was newly installed |
-| Two-Finger Scroll | Bundled GNOME Shell extension (`extensions/two-finger-scroll@finni`): dragging two fingers over Ghostty, Console or another terminal scrolls it like a touchpad, with momentum (terminals only select text on touch) | None; log out and in if it was newly installed |
-| Hardware Buttons | Bundled GNOME Shell extension (`extensions/hardware-buttons@finni`) giving the two programmable buttons (`XF86Launch1`, `XF86Launch2`) one action for a press and one for a hold: open an app, Overview, App Grid, on-screen keyboard, screenshot, notifications, Quick Settings, close window, lock, rotation lock, dark style, Do Not Disturb, voice typing (with Tablet Keyboard) or a command. Picked on the app's page; it takes the buttons over from GNOME Shell's own `show-screenshot-ui`/`toggle-overview` shortcuts, whose behaviour stays the default, and gives them back when turned off | None; log out and in if it was newly installed |
-| Tablet Keyboard | Bundled GNOME Shell extension (`extensions/tablet-keyboard@finni`) replacing the on-screen keyboard with an iPad-style one; layout follows the GNOME input source, adds an Esc/Tab/Ctrl/arrows row in terminals; hold the hide key for settings (height, split keyboard, autocorrect) | None; log out and in if it was newly installed |
-| Voice Typing | `apk add whisper.cpp` + a `dictate` helper in `~/.local/share/daylight-apps/voice-typing`; adds a microphone key to Tablet Keyboard (hold to talk, or tap to start and stop), which types the text itself. Engine is picked in the keyboard settings: Whisper `base.en` (English, 142 MB, downloaded on install) or Parakeet TDT 0.6B v3 q4_k (25 European languages, 416 MB, downloaded from the app's Speech Models list or when first picked) | "Try It" records in a terminal |
-| AirPods | Bundled Quick Settings extension (`extensions/airpods@finni`) that talks to the AirPods itself: it registers a BlueZ profile for Apple's AirPods control service and speaks its protocol (as reverse-engineered by [librepods](https://github.com/kavishdevar/librepods) / [omarchy-pods](https://github.com/MB-JAMBON/omarchy-pods)) over the L2CAP socket BlueZ hands over. Shows battery per AirPod and case, listening mode, adaptive level, Conversation Awareness (turns the volume down while you talk), One-Bud ANC, pauses media over MPRIS when you take them out, and connect/disconnect. No daemon or build step | "Pair AirPods" opens Bluetooth settings |
+| Neovim      | Flathub `io.neovim.nvim` + an `nvim` command in `~/.local/bin`        | Opens `nvim` in a terminal              |
+| VS Code     | Flathub `com.visualstudio.code`                                       | None                                    |
+
+### Services
+
+| App       | Installed via                                                          | Setup step                                   |
+|-----------|------------------------------------------------------------------------|----------------------------------------------|
+| Maestral  | Python venv in `~/.local/share/maestral-venv` + systemd user service   | Link Dropbox account (opens a terminal)      |
+| Tailscale | `apk add tailscale tailscale-systemd` (password prompt)                | `tailscale up`; login link shows as a button |
+
+### Extensions
+
+GNOME Shell extensions bundled in `extensions/`, each with an on/off switch. Log out and in
+after installing one for the first time.
+
+| App                  | What it does |
+|----------------------|--------------|
+| AirPods              | Quick Settings tile showing battery per AirPod and case, listening mode, adaptive level, Conversation Awareness and One-Bud ANC; pauses media when you take them out. Talks to the AirPods directly over a BlueZ L2CAP socket, using the protocol reverse-engineered by [librepods](https://github.com/kavishdevar/librepods) / [omarchy-pods](https://github.com/MB-JAMBON/omarchy-pods); no daemon. "Pair AirPods" opens Bluetooth settings |
+| Hardware Buttons     | Gives the two programmable buttons (`XF86Launch1`, `XF86Launch2`) one action for a press and one for a hold, picked on the app's page: an app, Overview, screenshot, voice typing, dark style, a command and more. Takes them over from GNOME Shell's own shortcuts and gives them back when turned off |
+| Maximize New Windows | Opens new windows maximized, see [dc-1-pmos#10](https://github.com/denysvitali/dc-1-pmos/issues/10) |
+| Tablet Keyboard      | iPad-style on-screen keyboard. Follows the GNOME input source and adds an Esc/Tab/Ctrl/arrows row in terminals; hold the hide key for settings (height, split keyboard, autocorrect) |
+| Two-Finger Scroll    | Dragging two fingers over Ghostty, Console or another terminal scrolls it like a touchpad, with momentum |
+| Voice Typing         | Add-on for Tablet Keyboard: `apk add whisper.cpp` + a `dictate` helper that adds a microphone key (hold to talk, or tap to start and stop). Engine is picked in the keyboard settings: Whisper `base.en` (English, 142 MB, downloaded on install) or Parakeet TDT 0.6B v3 (25 European languages, 416 MB, from the Speech Models list). "Try It" records in a terminal |
 
 ## Adding an app
 
 Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
 
 - `info`: `NAME=`, `SUMMARY=`, `ICON=` (space-separated icon names, first found wins),
+  `CATEGORY=` (`apps`, `developer`, `services` or `extensions`; defaults to `apps`),
   optional `WEBSITE=`, `SETUP_LABEL=`, `OPEN=` (desktop id or URL), `OPEN_LABEL=`
 - `install`: installs or updates (also used for **Update**)
 - `installed`: exit 0 when installed; first line of stdout is shown as status

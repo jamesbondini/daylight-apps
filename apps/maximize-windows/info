@@ -2,3 +2,4 @@ NAME=Maximize New Windows
 SUMMARY=GNOME extension that opens app windows full screen in portrait, instead of as small floating windows.
 ICON=view-fullscreen-symbolic
 WEBSITE=https://github.com/denysvitali/dc-1-pmos/issues/10
+CATEGORY=extensions

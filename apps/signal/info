@@ -4,3 +4,4 @@ ICON=org.signal.Signal internet-chat-symbolic
 WEBSITE=https://signal.org
 OPEN=org.signal.Signal
 OPEN_LABEL=Open
+CATEGORY=apps

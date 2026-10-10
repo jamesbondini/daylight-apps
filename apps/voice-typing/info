@@ -4,3 +4,4 @@ ICON=audio-input-microphone-symbolic
 WEBSITE=https://github.com/ggml-org/whisper.cpp
 SETUP_LABEL=Try It
 EXTRAS_TITLE=Speech Models
+CATEGORY=extensions

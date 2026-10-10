@@ -3,8 +3,8 @@
 
 Each app directory holds (in the spirit of Omarchy's install/installed/remove
 scripts):
-  info       KEY=value metadata (NAME, SUMMARY, ICON, WEBSITE, SETUP_LABEL,
-             OPEN, OPEN_LABEL)
+  info       KEY=value metadata (NAME, SUMMARY, ICON, CATEGORY, WEBSITE,
+             SETUP_LABEL, OPEN, OPEN_LABEL)
   install    install or update the app
   installed  exit 0 if installed, printing a one-line status
   remove     uninstall the app
@@ -37,6 +37,15 @@ from gi.repository import Adw, Gio, GLib, Gtk, Pango  # noqa: E402
 APP_ID = "dev.finni.DaylightApps"
 ROOT = Path(__file__).resolve().parent
 APP_DIRS = [ROOT / "apps", Path(GLib.get_user_config_dir()) / "daylight-apps" / "apps"]
+# CATEGORY values from info, in the order the main list shows them. Apps
+# without one go under "apps"; unknown categories follow, titled as written.
+CATEGORIES = {
+    "apps": ("Apps", "Desktop apps, installed from Flathub."),
+    "developer": ("Developer Tools", "Editors and coding agents for the terminal."),
+    "services": ("Services", "Run in the background; set up once with an account."),
+    "extensions": ("Extensions", "GNOME Shell extensions and add-ons for them. "
+                                 "Log out and in after installing one for the first time."),
+}
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
 URL_RE = re.compile(r"https?://[^\s'\"<>]+")
@@ -53,6 +62,7 @@ class AppEntry:
                 self.meta[key.strip()] = value.strip()
         self.name = self.meta.get("NAME", self.id)
         self.summary = self.meta.get("SUMMARY", "")
+        self.category = self.meta.get("CATEGORY", "apps")
         self.installed = None  # None = unknown
         self.status = ""
         self.enabled = None  # None = unknown or not switchable
@@ -539,8 +549,13 @@ class Window(Adw.ApplicationWindow):
         toolbar.add_top_bar(header)
 
         page = Adw.PreferencesPage()
-        group = Adw.PreferencesGroup(title="Apps", description="Install and set up apps on this device.")
-        page.add(group)
+        groups = {}
+        order = list(CATEGORIES) + sorted({a.category for a in self.apps} - set(CATEGORIES))
+        for cat in order:
+            if any(a.category == cat for a in self.apps):
+                title, description = CATEGORIES.get(cat, (cat.replace("-", " ").title(), None))
+                groups[cat] = Adw.PreferencesGroup(title=title, description=description)
+                page.add(groups[cat])
         for app in self.apps:
             row = Adw.ActionRow(title=app.name, subtitle=app.summary, activatable=True, subtitle_lines=2)
             icon = Gtk.Image(icon_name=app.icon_name(self), pixel_size=32)
@@ -554,7 +569,7 @@ class Window(Adw.ApplicationWindow):
             row.add_suffix(switch)
             row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
             row.connect("activated", lambda _, a=app: self.show_app(a))
-            group.add(row)
+            groups[app.category].add(row)
             self.rows[app.id] = (row, icon, badge, switch)
         if not self.apps:
             page = Adw.StatusPage(title="No Apps", description=f"Add app recipes to {APP_DIRS[-1]}",

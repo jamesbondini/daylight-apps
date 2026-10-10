@@ -4,3 +4,4 @@ ICON=org.localsend.localsend_app network-wireless-symbolic
 WEBSITE=https://localsend.org
 OPEN=org.localsend.localsend_app
 OPEN_LABEL=Open
+CATEGORY=apps
