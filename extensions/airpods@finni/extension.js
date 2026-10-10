@@ -129,9 +129,22 @@ class SliderItem extends PopupMenu.PopupBaseMenuItem {
         this.slider = new Slider(0.5);
         this.slider.x_expand = true;
         this.slider.connect('drag-end', () => onRelease(this.slider.value));
+        // Handlers run before the slider's own scroll handler moves it, so
+        // read the value once that has happened
         this.slider.connect('scroll-event', () => {
-            onRelease(this.slider.value);
+            if (!this._scrollId) {
+                this._scrollId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                    this._scrollId = 0;
+                    onRelease(this.slider.value);
+                    return GLib.SOURCE_REMOVE;
+                });
+            }
             return Clutter.EVENT_PROPAGATE;
+        });
+        this.connect('destroy', () => {
+            if (this._scrollId)
+                GLib.source_remove(this._scrollId);
+            this._scrollId = 0;
         });
         this.add_child(this.slider);
         this.add_child(new St.Label({text: 'More', y_align: Clutter.ActorAlign.CENTER}));

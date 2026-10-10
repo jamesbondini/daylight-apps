@@ -69,10 +69,13 @@ kill -INT "$rec" 2>/dev/null
 wait "$rec"
 rec=
 
+# A simple command, so the job is the engine itself and the TERM trap kills
+# it; a backgrounded case would be a subshell that leaves the engine running
 case "$ENGINE" in
-  whisper)  whisper-cli -m "$MODEL" -f "$WAV" -l en -t 4 -nt -np ;;
-  parakeet) parakeet-cli -m "$MODEL" -f "$WAV" -t 4 -np ;;
-esac 2>/dev/null >"$TMP/text" &
+  whisper)  cmd=(whisper-cli -m "$MODEL" -f "$WAV" -l en -t 4 -nt -np) ;;
+  parakeet) cmd=(parakeet-cli -m "$MODEL" -f "$WAV" -t 4 -np) ;;
+esac
+"${cmd[@]}" 2>/dev/null >"$TMP/text" &
 job=$!
 wait "$job" || exit 1
 

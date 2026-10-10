@@ -1951,6 +1951,9 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             this._grid.remove_style_class_name('tk-trackpad');
         if (key.spec.kind === 'shift')
             this._shiftHeld = Math.max(0, this._shiftHeld - 1);
+        // A held mic key that never sees its release must not keep recording
+        if (key.spec.kind === 'voice' && this._dictation)
+            this._voiceUp(touch);
         key.remove_style_pseudo_class('active');
     }
 

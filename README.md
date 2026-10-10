@@ -61,8 +61,8 @@ Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
 - `remove`: uninstalls
 - `setup` (optional): post-install step. Call `require_terminal "$0"` if it needs keyboard input.
 - `enabled`, `enable`, `disable` (optional, together): exit 0 when turned on, turn on, turn off.
-- `extras`, `extra-add`, `extra-remove` (optional, together): optional parts such as models. `extras` prints one `ID|Title|Subtitle|yes-or-no` line per part (yes when present); the page lists them under `EXTRAS_TITLE` (from `info`) with Download and Remove buttons that run `extra-add ID` and `extra-remove ID`.
   These add an on/off switch to the app's row and page; the GNOME Shell extensions use them.
+- `extras`, `extra-add`, `extra-remove` (optional, together): optional parts such as models. `extras` prints one `ID|Title|Subtitle|yes-or-no` line per part (yes when present); the page lists them under `EXTRAS_TITLE` (from `info`) with Download and Remove buttons that run `extra-add ID` and `extra-remove ID`.
 
 Scripts source `lib/common.sh` for `step`, `info`, `fail`, `as_root` (one polkit prompt per
 call), `apk_present`, `apk_add_cmd`/`apk_del_cmd`, `flatpak_install_app`/`flatpak_status`/

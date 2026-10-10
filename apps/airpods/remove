@@ -14,7 +14,8 @@ systemctl --user disable --now --quiet librepods.service 2>/dev/null || true
 
 step "Removing files"
 if [ -f "$DATA/build/install_manifest.txt" ]; then
-  xargs -d '\n' rm -f < "$DATA/build/install_manifest.txt"
+  # BusyBox xargs has no -d
+  tr '\n' '\0' < "$DATA/build/install_manifest.txt" | xargs -0 -r rm -f
 fi
 rm -f "$HOME/.local/bin/librepods" "$HOME/.local/bin/librepods-ctl" \
   "$HOME/.local/share/systemd/user/librepods.service"

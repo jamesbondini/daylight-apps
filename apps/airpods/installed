@@ -21,7 +21,8 @@ if not s.get("connected"):
 parts = []
 for key, label in (("left", "L"), ("right", "R"), ("case", "Case"), ("headset", "")):
     b = s.get(key) or {}
-    if b.get("available") and b.get("level", -1) >= 0:
-        parts.append(f"{label} {b['level']}%".strip())
+    level = b.get("level")
+    if b.get("available") and isinstance(level, int) and level >= 0:
+        parts.append(f"{label} {level}%".strip())
 print(" · ".join([f"{name} connected"] + parts))
 PY

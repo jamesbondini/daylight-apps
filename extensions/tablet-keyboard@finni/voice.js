@@ -27,8 +27,14 @@ const LEVEL_FLOOR_DB = -55;
 const LEVEL_CEIL_DB = -15;
 
 function modelPresent(engine) {
+    // Non-empty, like the helper's own check
     const path = GLib.build_filenamev([DIR, MODELS[engine].file]);
-    return GLib.file_test(path, GLib.FileTest.EXISTS);
+    try {
+        return Gio.File.new_for_path(path).query_info('standard::size',
+            Gio.FileQueryInfoFlags.NONE, null).get_size() > 0;
+    } catch {
+        return false;
+    }
 }
 
 // Model downloads outlive the keyboard, which the shell rebuilds when touch
