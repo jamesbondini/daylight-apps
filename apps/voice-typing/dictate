@@ -5,6 +5,7 @@
 #                                line or end of input arrives on stdin, then
 #                                print the transcription. SIGTERM cancels.
 #   dictate --download ENGINE    Download the engine's model.
+#   dictate --path ENGINE        Print where the engine's model goes.
 set -u
 
 MODELS="${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing"
@@ -23,6 +24,12 @@ model_url() {
     parakeet) echo "https://huggingface.co/ggml-org/parakeet-GGUF/resolve/main/$(model_file "$1")" ;;
   esac
 }
+
+if [ "${1:-}" = --path ]; then
+  file="$(model_file "${2:-whisper}")" || exit 2
+  echo "$MODELS/$file"
+  exit 0
+fi
 
 if [ "${1:-}" = --download ]; then
   engine="${2:-whisper}"

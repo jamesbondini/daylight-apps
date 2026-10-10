@@ -10,8 +10,5 @@ elif ! gnome_ext_enabled tablet-keyboard@finni; then
   echo "Install Tablet Keyboard for the microphone key"
 else
   engine=$(voice_engine)
-  models=()
-  [ -s "$DEST/ggml-base.en.bin" ] && models+=(Whisper)
-  ls "$DEST"/ggml-parakeet-*.bin >/dev/null 2>&1 && models+=(Parakeet)
-  echo "Ready · using ${engine^} · downloaded: ${models[*]:-none}"
+  echo "Ready · using ${engine^}"
 fi

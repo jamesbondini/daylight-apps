@@ -1,7 +1,8 @@
 #!/bin/bash
 # Install whisper.cpp (which also provides parakeet-cli), download the Whisper
 # base.en model and set up the dictate helper Tablet Keyboard's microphone
-# key uses. The Parakeet model downloads when it is first picked.
+# key uses. The Parakeet model downloads from the app's Speech Models list,
+# or when it is first picked in the keyboard settings.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
 HERE="$(dirname "$(readlink -f "$0")")"
@@ -24,5 +25,5 @@ install -m 755 "$HERE/dictate" "$DEST/dictate"
 step "Done"
 info "Tablet Keyboard now has a microphone key next to the emoji key:"
 info "hold it while you speak, or tap to start and tap again to stop."
-info "For other languages, pick Parakeet under Voice typing in the keyboard"
-info "settings (hold the hide key); its model (416 MB) downloads then."
+info "For other languages, download Parakeet under Speech Models below and"
+info "pick it under Voice typing in the keyboard settings (hold the hide key)."

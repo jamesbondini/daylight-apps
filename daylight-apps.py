@@ -11,6 +11,10 @@ scripts):
   setup      optional post-install step (login, account linking, ...)
   enabled    optional: exit 0 if turned on; with `enable` and `disable`
              this adds an on/off switch (e.g. for GNOME Shell extensions)
+  extras     optional: list optional parts (e.g. models), one per line as
+             ID|Title|Subtitle|yes-or-no (downloaded); `extra-add ID` and
+             `extra-remove ID` download and delete one. Group title comes
+             from EXTRAS_TITLE in info.
 """
 
 import os
@@ -46,6 +50,7 @@ class AppEntry:
         self.installed = None  # None = unknown
         self.status = ""
         self.enabled = None  # None = unknown or not switchable
+        self.extras = []  # (id, title, subtitle, present)
         self.toggling = False
 
     def script(self, name):
@@ -93,11 +98,36 @@ def check_installed(app, callback):
             app.status = (out or "").strip().splitlines()[0] if (out or "").strip() else ""
         except GLib.Error:
             app.installed, app.status = False, ""
-        if app.installed and app.switchable:
-            check_enabled(app, callback)
+        app.enabled = None
+        if not app.installed:
+            app.extras = []
+        after_extras = lambda: (check_enabled(app, callback) if app.installed and app.switchable
+                                else callback(app))
+        if app.installed and app.script("extras"):
+            check_extras(app, after_extras)
         else:
-            app.enabled = None
-            callback(app)
+            after_extras()
+
+    proc.communicate_utf8_async(None, None, done)
+
+
+def check_extras(app, callback):
+    """Run the app's `extras` script asynchronously."""
+    launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
+    launcher.set_environ(script_env())
+    proc = launcher.spawnv([str(app.path / "extras")])
+
+    def done(proc, res):
+        try:
+            _, out, _ = proc.communicate_utf8_finish(res)
+        except GLib.Error:
+            out = ""
+        app.extras = []
+        for line in (out or "").splitlines():
+            parts = line.split("|")
+            if len(parts) == 4:
+                app.extras.append((parts[0], parts[1], parts[2], parts[3].strip() == "yes"))
+        callback()
 
     proc.communicate_utf8_async(None, None, done)
 
@@ -167,6 +197,10 @@ class AppPage(Adw.NavigationPage):
         self.switch_group.add(self.switch_row)
         box.append(self.switch_group)
 
+        # Optional parts, e.g. downloadable models
+        self.extras_group = Adw.PreferencesGroup(title=app.meta.get("EXTRAS_TITLE", "Extras"), visible=False)
+        self.extra_rows = []
+
         # Action buttons
         self.actions = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, column_spacing=8,
                                    row_spacing=8, max_children_per_line=4, homogeneous=False,
@@ -182,6 +216,7 @@ class AppPage(Adw.NavigationPage):
         cancel.connect("clicked", lambda *_: self.proc and self.proc.force_exit())
         self.busy.append(cancel)
         box.append(self.busy)
+        box.append(self.extras_group)
 
         # Links found in the output (e.g. Tailscale login URL)
         self.links = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, visible=False)
@@ -229,6 +264,7 @@ class AppPage(Adw.NavigationPage):
             self.syncing = False
         self.switch_row.set_sensitive(not running and not app.toggling)
         self.switch_row.set_subtitle("Switching…" if app.toggling else app.status)
+        self.update_extras(running)
 
         while child := self.actions.get_first_child():
             self.actions.remove(child)
@@ -254,6 +290,29 @@ class AppPage(Adw.NavigationPage):
             add(app.meta.get("OPEN_LABEL", "Open"), self.open_app)
         add("Update", lambda: self.run("install", f"Updating {app.name}…"))
         add("Remove", self.confirm_remove, "destructive-action")
+
+    def update_extras(self, running):
+        app = self.app
+        for row in self.extra_rows:
+            self.extras_group.remove(row)
+        self.extra_rows = []
+        self.extras_group.set_visible(bool(app.installed) and bool(app.extras))
+        if not app.installed:
+            return
+        for ident, title, subtitle, present in app.extras:
+            row = Adw.ActionRow(title=title, subtitle=subtitle)
+            button = Gtk.Button(label="Remove" if present else "Download", valign=Gtk.Align.CENTER,
+                                sensitive=not running)
+            button.add_css_class("pill")
+            if present:
+                button.connect("clicked", lambda *_, i=ident, t=title: self.confirm_remove_extra(i, t))
+            else:
+                button.add_css_class("suggested-action")
+                button.connect("clicked", lambda *_, i=ident, t=title:
+                               self.run("extra-add", f"Downloading {t}…", [i], t))
+            row.add_suffix(button)
+            self.extras_group.add(row)
+            self.extra_rows.append(row)
 
     # ---- actions ----
 
@@ -281,7 +340,17 @@ class AppPage(Adw.NavigationPage):
         dialog.connect("response", lambda _, r: r == "remove" and self.run("remove", f"Removing {self.app.name}…"))
         dialog.present(self.window)
 
-    def run(self, script, label):
+    def confirm_remove_extra(self, ident, title):
+        dialog = Adw.AlertDialog(heading=f"Remove {title}?",
+                                 body="You can download it again here at any time.")
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("remove", "Remove")
+        dialog.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", lambda _, r: r == "remove" and
+                       self.run("extra-remove", f"Removing {title}…", [ident], title))
+        dialog.present(self.window)
+
+    def run(self, script, label, args=(), what=None):
         self.buffer.set_text("")
         self.urls.clear()
         while child := self.links.get_first_child():
@@ -294,14 +363,14 @@ class AppPage(Adw.NavigationPage):
         launcher.set_environ(script_env())
         launcher.set_cwd(str(self.app.path))
         try:
-            self.proc = launcher.spawnv([str(self.app.path / script)])
+            self.proc = launcher.spawnv([str(self.app.path / script), *args])
         except GLib.Error as e:
             self.append(f"Failed to start: {e.message}\n")
             return
         self.window.on_status(self.app)
         stream = Gio.DataInputStream.new(self.proc.get_stdout_pipe())
         stream.read_line_async(GLib.PRIORITY_DEFAULT, None, self.on_line, stream)
-        self.proc.wait_async(None, self.on_exit, script)
+        self.proc.wait_async(None, self.on_exit, (script, what or self.app.name))
 
     def on_line(self, stream, res, _data):
         try:
@@ -338,19 +407,21 @@ class AppPage(Adw.NavigationPage):
         self.links.append(button)
         self.links.set_visible(True)
 
-    def on_exit(self, proc, res, script):
+    def on_exit(self, proc, res, data):
+        script, what = data
         try:
             proc.wait_finish(res)
         except GLib.Error:
             pass
         ok = proc.get_if_exited() and proc.get_exit_status() == 0
         self.proc = None
-        verb = {"install": "Install", "remove": "Removal", "setup": "Setup"}.get(script, script)
+        verb = {"install": "Install", "remove": "Removal", "setup": "Setup",
+                "extra-add": "Download", "extra-remove": "Removal"}.get(script, script)
         if ok:
-            self.window.toast(f"{verb} of {self.app.name} finished")
+            self.window.toast(f"{verb} of {what} finished")
         else:
             self.append("\nFailed." if proc.get_if_exited() else "\nCancelled.")
-            self.window.toast(f"{verb} of {self.app.name} failed")
+            self.window.toast(f"{verb} of {what} failed")
         self.app.installed = None
         self.window.on_status(self.app)
         self.refresh()

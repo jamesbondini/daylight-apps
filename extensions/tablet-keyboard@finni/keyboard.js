@@ -544,6 +544,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     }
 
     _onDestroy() {
+        this._destroyed = true;
         super._onDestroy();
 
         // The stock keyboard never removes this
@@ -701,6 +702,13 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (this._grid?.get_transformed_extents().contains_point(begin))
             return false;
         return super._panMayRecognize(gesture);
+    }
+
+    // The stock keyboard never disconnects its overview 'showing' handler,
+    // which calls this on keyboards destroyed by a rebuild
+    close(...args) {
+        if (!this._destroyed)
+            super.close(...args);
     }
 
     _animateHide() {
@@ -1342,7 +1350,17 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
     _openSettings() {
         this.close(true);
-        extension?.openPreferences();
+        // A window opened from the overview's search would stay behind it
+        Main.overview.hide();
+
+        // The prefs service refuses a second dialog, so raise the open one
+        const open = global.display.list_all_windows().find(w =>
+            w.get_wm_class() === 'org.gnome.Shell.Extensions' &&
+            w.get_title() === extension?.metadata.name);
+        if (open)
+            Main.activateWindow(open);
+        else
+            extension?.openPreferences();
     }
 
     _toggleMod(keyval) {

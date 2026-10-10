@@ -1,0 +1,13 @@
+#!/bin/bash
+# Download a speech model: extra-add whisper|parakeet
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+HERE="$(dirname "$(readlink -f "$0")")"
+"$HERE/dictate" --path "${1:-}" >/dev/null 2>&1 || fail "Unknown model: ${1:-}"
+step "Downloading the ${1^} model"
+"$HERE/dictate" --download "$1" || fail "Download failed"
+step "Done"
+if [ "$1" != "$(voice_engine)" ]; then
+  info "To use it, pick ${1^} under Voice typing in the keyboard settings"
+  info "(hold the hide key, then Settings)."
+fi

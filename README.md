@@ -47,7 +47,7 @@ cd ~/Projects/daylight-apps && git pull
 | Claude Code | Official native installer (`claude.ai/install.sh`, arm64-musl) + `libgcc libstdc++ ripgrep` | Opens `claude` in a terminal to sign in |
 | Maximize New Windows | Bundled GNOME Shell extension (`extensions/maximize-new-windows@finni`), see [dc-1-pmos#10](https://github.com/denysvitali/dc-1-pmos/issues/10) | None; log out and in if it was newly installed |
 | Tablet Keyboard | Bundled GNOME Shell extension (`extensions/tablet-keyboard@finni`) replacing the on-screen keyboard with an iPad-style one; layout follows the GNOME input source, adds an Esc/Tab/Ctrl/arrows row in terminals; hold the hide key for settings (height, split keyboard, autocorrect) | None; log out and in if it was newly installed |
-| Voice Typing | `apk add whisper.cpp` + a `dictate` helper in `~/.local/share/daylight-apps/voice-typing`; adds a microphone key to Tablet Keyboard (hold to talk, or tap to start and stop), which types the text itself. Engine is picked in the keyboard settings: Whisper `base.en` (English, 142 MB, downloaded on install) or Parakeet TDT 0.6B v3 q4_k (25 European languages, 416 MB, downloaded when first picked) | "Try It" records in a terminal |
+| Voice Typing | `apk add whisper.cpp` + a `dictate` helper in `~/.local/share/daylight-apps/voice-typing`; adds a microphone key to Tablet Keyboard (hold to talk, or tap to start and stop), which types the text itself. Engine is picked in the keyboard settings: Whisper `base.en` (English, 142 MB, downloaded on install) or Parakeet TDT 0.6B v3 q4_k (25 European languages, 416 MB, downloaded from the app's Speech Models list or when first picked) | "Try It" records in a terminal |
 
 ## Adding an app
 
@@ -60,6 +60,7 @@ Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
 - `remove`: uninstalls
 - `setup` (optional): post-install step. Call `require_terminal "$0"` if it needs keyboard input.
 - `enabled`, `enable`, `disable` (optional, together): exit 0 when turned on, turn on, turn off.
+- `extras`, `extra-add`, `extra-remove` (optional, together): optional parts such as models. `extras` prints one `ID|Title|Subtitle|yes-or-no` line per part (yes when present); the page lists them under `EXTRAS_TITLE` (from `info`) with Download and Remove buttons that run `extra-add ID` and `extra-remove ID`.
   These add an on/off switch to the app's row and page; the GNOME Shell extensions use them.
 
 Scripts source `lib/common.sh` for `step`, `info`, `fail`, `as_root` (one polkit prompt per
