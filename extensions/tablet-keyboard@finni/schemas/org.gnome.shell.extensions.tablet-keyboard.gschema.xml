@@ -16,13 +16,21 @@
       <default>false</default>
       <summary>Split the keyboard in two halves in landscape</summary>
     </key>
+    <key name="split-keyboard-portrait" type="b">
+      <default>false</default>
+      <summary>Split the keyboard in two halves in portrait</summary>
+    </key>
     <key name="swipe-symbols" type="b">
       <default>true</default>
       <summary>Swipe down on a key to type its digit or symbol</summary>
     </key>
     <key name="shortcut-bar" type="b">
       <default>true</default>
-      <summary>Show undo, redo, paste and previous/next field buttons above the keys</summary>
+      <summary>Show a bar above the keys: undo, redo, paste and previous/next field buttons, or the special keys</summary>
+    </key>
+    <key name="special-keys" type="b">
+      <default>false</default>
+      <summary>Show esc, tab, ctrl, alt and arrow keys in the bar instead of the shortcuts, as in terminals</summary>
     </key>
     <key name="auto-capitalize" type="b">
       <default>true</default>

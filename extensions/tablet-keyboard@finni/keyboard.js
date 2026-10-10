@@ -16,7 +16,7 @@ import * as KeyboardUI from 'resource:///org/gnome/shell/ui/keyboard.js';
 import * as InputSourceManager from 'resource:///org/gnome/shell/ui/status/keyboard.js';
 
 import {findCorrection} from './autocorrect.js';
-import {buildPages, variantFor} from './layouts.js';
+import {SPLIT_GAP, buildPages, variantFor} from './layouts.js';
 import {Dictation} from './voice.js';
 
 const LONG_PRESS_MS = 450;
@@ -603,8 +603,10 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             'changed::portrait-height', () => this._relayout(),
             'changed::landscape-height', () => this._relayout(),
             'changed::split-keyboard', () => this._relayout(),
+            'changed::split-keyboard-portrait', () => this._relayout(),
             'changed::swipe-symbols', () => this._rebuildPages(),
             'changed::shortcut-bar', () => this._syncToolbar(),
+            'changed::special-keys', () => this._syncToolbar(),
             'changed::auto-capitalize', () => this._updateAutoShift(),
             'changed::voice-engine', () =>
                 this._dictation?.setEngine(this._settings.get_string('voice-engine')),
@@ -630,7 +632,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._lastSpaceTime = 0;
         this._queue = Promise.resolve();
         this._pageName = 'letters';
-        this._splitActive = false;
+        this._splitActive = 0;
         this._selection = null;
         this._lastCorrection = null;
         this._keepWord = null;
@@ -755,8 +757,15 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         return !!monitor && monitor.width > monitor.height;
     }
 
+    _splitKey() {
+        return this._isLandscape() ? 'split-keyboard' : 'split-keyboard-portrait';
+    }
+
+    // The gap of the split keyboard for this orientation, or 0 for none
     _wantSplit() {
-        return this._isLandscape() && this._settings.get_boolean('split-keyboard');
+        if (!this._settings.get_boolean(this._splitKey()))
+            return 0;
+        return this._isLandscape() ? SPLIT_GAP.landscape : SPLIT_GAP.portrait;
     }
 
     _onPurposeChanged(controller, purpose) {
@@ -1409,6 +1418,19 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         add('↓', key(Clutter.KEY_Down));
         add('→', key(Clutter.KEY_Right));
 
+        // Back to the shortcuts, outside terminals
+        this._shortcutsButton = new St.Button({
+            style_class: 'tk-tool tk-shortcut',
+            child: new St.Icon({
+                style_class: 'tk-shortcut-icon',
+                icon_name: 'view-more-horizontal-symbolic',
+            }),
+            can_focus: false,
+        });
+        this._shortcutsButton.connect('clicked',
+            () => this._settings.set_boolean('special-keys', false));
+        toolbar.add_child(this._shortcutsButton);
+
         return toolbar;
     }
 
@@ -1416,14 +1438,19 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (!this._toolbar)
             return;
 
+        // Terminals always get the special keys, other apps the shortcuts
+        // unless switched to the special keys
         const terminal = this._isTerminal();
-        const shortcuts = !terminal && this._settings.get_boolean('shortcut-bar');
-        if (this._toolbar.visible === terminal && this._shortcutBar.visible === shortcuts)
+        const bar = this._settings.get_boolean('shortcut-bar');
+        const keys = bar && (terminal || this._settings.get_boolean('special-keys'));
+        const shortcuts = bar && !keys;
+        this._shortcutsButton.visible = !terminal;
+        if (this._toolbar.visible === keys && this._shortcutBar.visible === shortcuts)
             return;
 
-        this._toolbar.visible = terminal;
+        this._toolbar.visible = keys;
         this._shortcutBar.visible = shortcuts;
-        if (!terminal)
+        if (!keys)
             this._setMods(new Set());
         this._relayout();
     }
@@ -1463,6 +1490,14 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._setSelection(this._selection);
 
         bar.add_child(new St.Widget({x_expand: true}));
+        // Switches the bar to esc, tab, ctrl, alt and the arrows
+        const special = new St.Button({
+            style_class: 'tk-tool tk-shortcut',
+            label: 'esc',
+            can_focus: false,
+        });
+        special.connect('clicked', () => this._settings.set_boolean('special-keys', true));
+        bar.add_child(special);
         // Previous and next field, like Shift+Tab and Tab
         add('go-previous-symbolic', () =>
             this._sendCombo([Clutter.KEY_Shift_L], Clutter.KEY_Tab));
@@ -1471,11 +1506,12 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         return bar;
     }
 
-    // Holding the hide key offers split/merge and the settings
+    // Holding the hide key offers split/merge for this orientation, showing
+    // and hiding the bar above the keys, and the settings
     _openMenu(touch) {
-        const split = this._settings.get_boolean('split-keyboard');
-        touch.menu = this._isLandscape()
-            ? [split ? 'Merge' : 'Split', 'Settings'] : ['Settings'];
+        const split = this._settings.get_boolean(this._splitKey());
+        const bar = this._settings.get_boolean('shortcut-bar');
+        touch.menu = [split ? 'Merge' : 'Split', bar ? 'Hide bar' : 'Show bar', 'Settings'];
         touch.mode = 'menu';
         touch.accents = new AccentPopup(touch.key, touch.menu, this._theme,
             {widthScale: 2.4, fontScale: 0.26});
@@ -1483,7 +1519,9 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
     _menuChoice(choice) {
         if (choice === 'Split' || choice === 'Merge')
-            this._settings.set_boolean('split-keyboard', choice === 'Split');
+            this._settings.set_boolean(this._splitKey(), choice === 'Split');
+        else if (choice === 'Hide bar' || choice === 'Show bar')
+            this._settings.set_boolean('shortcut-bar', choice === 'Show bar');
         else if (choice === 'Settings')
             this._openSettings();
     }

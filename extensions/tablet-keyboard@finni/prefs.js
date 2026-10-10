@@ -17,6 +17,13 @@ export default class TabletKeyboardPreferences extends ExtensionPreferences {
         const page = new Adw.PreferencesPage();
         window.add(page);
 
+        // GTK focuses the first height field when the window opens, which
+        // brings the keyboard back up showing the number keypad
+        if (window.visible)
+            window.set_focus(null);
+        else
+            window.connect('show', () => window.set_focus(null));
+
         const switchRow = (group, key, title, subtitle = '') => {
             const row = new Adw.SwitchRow({title, subtitle});
             settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
@@ -36,8 +43,14 @@ export default class TabletKeyboardPreferences extends ExtensionPreferences {
         heightRow(look, 'landscape-height', 'Key height in landscape');
         switchRow(look, 'split-keyboard', 'Split keyboard in landscape',
             'Two halves at the sides, for typing with your thumbs');
-        switchRow(look, 'shortcut-bar', 'Shortcut bar',
-            'Undo, redo and paste above the keys, cut and copy when text is selected, and arrows to the previous and next field');
+        switchRow(look, 'split-keyboard-portrait', 'Split keyboard in portrait',
+            'Hold the hide key to split or merge the keyboard for the current orientation');
+        switchRow(look, 'shortcut-bar', 'Bar above the keys',
+            'Undo, redo and paste, cut and copy when text is selected, and arrows to the previous and next field. ' +
+            'Hold the hide key to hide or show it');
+        switchRow(look, 'special-keys', 'Special keys in the bar',
+            'Esc, tab, ctrl, alt and arrow keys instead of the shortcuts. ' +
+            'Tap esc in the bar to switch to them and … to switch back. Terminals always have them');
 
         const scheme = new Adw.ComboRow({
             title: 'Theme',

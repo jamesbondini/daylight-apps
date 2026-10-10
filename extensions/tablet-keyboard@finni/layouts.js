@@ -3,8 +3,9 @@
 
 import Gio from 'gi://Gio';
 
-// Width of the empty middle of a split keyboard, relative to the keys
-const SPLIT_GAP = 0.56;
+// Width of the empty middle of a split keyboard, relative to the keys. Less
+// in portrait, where the screen is narrow and the keys would get too small.
+export const SPLIT_GAP = {landscape: 0.56, portrait: 0.3};
 
 const FALLBACK_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 
@@ -183,10 +184,11 @@ function symbolPage(rows, alts, otherPage, otherLabel, opts) {
     };
 }
 
-// Splits a page into two halves with an untouchable gap in the middle: each
-// row breaks after half of its characters, the space bar in two.
-function splitPage(page) {
-    const gap = Math.round(page.units * SPLIT_GAP * 10) / 10;
+// Splits a page into two halves with an untouchable gap in the middle, of
+// `gapRatio` times the page width: each row breaks after half of its
+// characters, the space bar in two.
+function splitPage(page, gapRatio) {
+    const gap = Math.round(page.units * gapRatio * 10) / 10;
     const rows = page.rows.map(row => {
         const space = row.findIndex(k => k.kind === 'space');
         if (space >= 0) {
@@ -266,9 +268,10 @@ function withoutAlts(page) {
 }
 
 // The pages for a field: letters, numbers and symbols, plus a keypad that
-// comes first for number fields
+// comes first for number fields. `split` is the gap of a split keyboard from
+// SPLIT_GAP, or 0.
 export function buildPages(group, multiSource,
-    {split = false, alts = true, voice = false, variant = 'text'} = {}) {
+    {split = 0, alts = true, voice = false, variant = 'text'} = {}) {
     const pages = basePages(group, {multiSource, voice, variant});
     if (variant in KEYPAD_EXTRAS)
         pages.keypad = keypadPage(variant);
@@ -277,7 +280,7 @@ export function buildPages(group, multiSource,
             pages[name] = withoutAlts(pages[name]);
         // The keypad is narrow enough already
         if (split && !pages[name].keypad)
-            pages[name] = splitPage(pages[name]);
+            pages[name] = splitPage(pages[name], split);
     }
     return pages;
 }
