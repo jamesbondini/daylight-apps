@@ -3,6 +3,8 @@
 A small GTK/libadwaita installer for the Daylight DC-1 (Nura / postmarketOS, aarch64, musl),
 modelled on Omarchy's `omarchy-install-*` / `omarchy-installed-*` / `omarchy-remove-*` scripts.
 
+**[Latest release](https://github.com/jamesbondini/daylight-apps/releases/latest)**: what's included and how to install.
+
 ## Getting started
 
 Run this in a terminal:
