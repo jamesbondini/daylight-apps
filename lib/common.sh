@@ -69,10 +69,15 @@ flatpak_remove_app() {
   flatpak uninstall -y --noninteractive "$1"
 }
 
-# Open a command in a Ghostty window (reusing the main, software-GL instance),
-# keeping it open afterwards so the user can read the result.
+# Open a command in a GNOME Console window, keeping it open afterwards so the
+# user can read the result. Falls back to Ghostty (reusing the main,
+# software-GL instance) where Console isn't installed.
 in_terminal() {
   local cmd="$1; echo; read -rp 'Press Enter to close…' _"
+  if cmd_present kgx; then
+    setsid kgx -- bash -c "$cmd" >/dev/null 2>&1 &
+    return 0
+  fi
   if ghostty +new-window -e bash -c "$cmd" 2>/dev/null; then
     return 0
   fi
