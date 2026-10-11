@@ -9,6 +9,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Graphene from 'gi://Graphene';
+import Meta from 'gi://Meta';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -612,6 +613,16 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
                 this._dictation?.setEngine(this._settings.get_string('voice-engine')),
             this);
         this._syncColorScheme();
+
+        // The parent only learns the focused window when focus moves, which
+        // leaves a keyboard created after a touch mode switch without one
+        this._setFocusWindow(this._focusTracker.currentWindow);
+
+        // Follow height changes (bars, rotation, settings) with the window
+        this.connect('notify::allocation', () => {
+            if (this._keyboardVisible && this._focusWindow && !Main.overview.visible)
+                this._fitWindow(this._focusWindow);
+        });
     }
 
     // Called from the parent constructor via _setupKeyboard()
@@ -633,6 +644,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._queue = Promise.resolve();
         this._pageName = 'letters';
         this._splitActive = 0;
+        this._movedWindows = new Map();
         this._selection = null;
         this._lastCorrection = null;
         this._keepWord = null;
@@ -674,6 +686,9 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
     _onDestroy() {
         this._destroyed = true;
+        // A rebuilt keyboard must not inherit shrunken windows
+        for (const window of [...this._movedWindows.keys()])
+            this._restoreWindow(window);
         super._onDestroy();
 
         // The stock keyboard never removes this
@@ -851,6 +866,78 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     close(...args) {
         if (!this._destroyed)
             super.close(...args);
+    }
+
+    // The stock version only makes room for vertically maximized windows, and
+    // loses track of them when the keyboard is rebuilt
+    _animateWindow(window, show) {
+        // Our own maximize changes call back in here
+        if (this._movingWindow)
+            return;
+        if (show)
+            this._fitWindow(window);
+        else
+            this._restoreWindow(window);
+    }
+
+    // Moves the window up and shrinks it to end above the keyboard, so the
+    // text being typed (often at the bottom, as in terminals) stays in view
+    _fitWindow(window) {
+        const monitor = Main.layoutManager.keyboardMonitor;
+        if (!monitor || window.is_alien() || window.is_fullscreen() ||
+            !window.allows_move() || window.get_monitor() !== monitor.index)
+            return;
+
+        const workArea = Main.layoutManager.getWorkAreaForMonitor(monitor.index);
+        // The bottom panel inside the keyboard box is already outside the work area
+        const panelHeight = this._bottomPanelBox?.allocation.get_height() ?? 0;
+        const keyboardTop = workArea.y + workArea.height -
+            Math.max(0, this.allocation.get_height() - panelHeight);
+
+        let entry = this._movedWindows.get(window);
+        if (!entry) {
+            const frame = window.get_frame_rect();
+            if (frame.y + frame.height <= keyboardTop)
+                return;
+            entry = {
+                maximized: window.maximized_vertically,
+                y: frame.y,
+                height: frame.height,
+            };
+            window.connectObject('unmanaged', () => this._movedWindows.delete(window), this);
+            this._movedWindows.set(window, entry);
+        }
+
+        const frame = window.get_frame_rect();
+        const fullHeight = entry.maximized ? workArea.height : entry.height;
+        const startY = entry.maximized ? workArea.y : entry.y;
+        const y = Math.max(workArea.y, Math.min(startY, keyboardTop - fullHeight));
+        const height = window.allows_resize() ? Math.min(fullHeight, keyboardTop - y) : frame.height;
+        if (frame.y === y && frame.height === height && !window.maximized_vertically)
+            return;
+
+        this._movingWindow = true;
+        if (window.maximized_vertically)
+            window.unmaximize(Meta.MaximizeFlags.VERTICAL);
+        window.move_resize_frame(false, frame.x, y, frame.width, height);
+        this._movingWindow = false;
+    }
+
+    _restoreWindow(window) {
+        const entry = this._movedWindows.get(window);
+        if (!entry)
+            return;
+        this._movedWindows.delete(window);
+        window.disconnectObject(this);
+
+        this._movingWindow = true;
+        if (entry.maximized) {
+            window.maximize(Meta.MaximizeFlags.VERTICAL);
+        } else {
+            const frame = window.get_frame_rect();
+            window.move_resize_frame(false, frame.x, entry.y, frame.width, entry.height);
+        }
+        this._movingWindow = false;
     }
 
     _animateHide() {
