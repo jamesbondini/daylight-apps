@@ -55,7 +55,6 @@ Installed per user from Flathub; install Flatpak (under Start Here) first.
 | Déjà Dup  | `org.gnome.DejaDup`            | Open the app and choose what to back up and where |
 | LocalSend | `org.localsend.localsend_app`  | None                                        |
 | Obsidian  | `md.obsidian.Obsidian`         | Open the app and pick a vault               |
-| Signal    | `org.signal.Signal`            | Open the app and link it to your phone      |
 
 Brave also gets `/etc/brave/policies/managed/daylight-apps.json`, turning off Rewards, Wallet,
 VPN, Leo, News and telemetry (Brave Origin has no musl build).
