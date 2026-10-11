@@ -30,7 +30,11 @@ const SHIFT_DOUBLE_TAP_MS = 350;
 const DOUBLE_SPACE_MS = 1200;
 const TYPING_QUIET_MS = 400;
 const FLICK_START_PX = 10;
+// Swipe-down characters start after a fifth of a key height and are typed
+// at half a key height (0.2 + 0.5 * 0.6 in _onMove)
+const flickStart = key => Math.max(FLICK_START_PX, key.height * 0.2);
 const RESET_MS = 140;
+const WINDOW_SLIDE_MS = 150;
 // Holding the mic key longer than this is push-to-talk, shorter toggles
 const VOICE_HOLD_MS = 350;
 
@@ -880,8 +884,10 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             this._restoreWindow(window);
     }
 
-    // Moves the window up and shrinks it to end above the keyboard, so the
-    // text being typed (often at the bottom, as in terminals) stays in view
+    // Makes the window end above the keyboard, so the text being typed (often
+    // at the bottom, as in terminals) stays in view. Terminals slide up
+    // instead of shrinking: a resize reflows them and can leave the view
+    // scrolled away from the prompt.
     _fitWindow(window) {
         const monitor = Main.layoutManager.keyboardMonitor;
         if (!monitor || window.is_alien() || window.is_fullscreen() ||
@@ -900,6 +906,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             if (frame.y + frame.height <= keyboardTop)
                 return;
             entry = {
+                slide: window === this._focusWindow && this._isTerminal(),
                 maximized: window.maximized_vertically,
                 y: frame.y,
                 height: frame.height,
@@ -909,6 +916,15 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         }
 
         const frame = window.get_frame_rect();
+        if (entry.slide) {
+            window.get_compositor_private()?.ease({
+                translation_y: Math.min(0, keyboardTop - (frame.y + frame.height)),
+                duration: WINDOW_SLIDE_MS,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+            return;
+        }
+
         const fullHeight = entry.maximized ? workArea.height : entry.height;
         const startY = entry.maximized ? workArea.y : entry.y;
         const y = Math.max(workArea.y, Math.min(startY, keyboardTop - fullHeight));
@@ -929,6 +945,15 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             return;
         this._movedWindows.delete(window);
         window.disconnectObject(this);
+
+        if (entry.slide) {
+            window.get_compositor_private()?.ease({
+                translation_y: 0,
+                duration: WINDOW_SLIDE_MS,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+            return;
+        }
 
         this._movingWindow = true;
         if (entry.maximized) {
@@ -1805,8 +1830,8 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             this._movePress(touch);
             break;
         case 'flick': {
-            const distance = touch.key.height * 0.45;
-            touch.flick = Math.clamp((y - touch.y0 - FLICK_START_PX) / distance, 0, 1);
+            const distance = touch.key.height * 0.6;
+            touch.flick = Math.clamp((y - touch.y0 - flickStart(touch.key)) / distance, 0, 1);
             touch.key.setFlick(touch.flick);
             break;
         }
@@ -1826,7 +1851,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         const dy = touch.y - touch.y0;
 
         if (key?.spec.kind === 'char' && key.spec.alt && !touch.slide &&
-            dy > FLICK_START_PX && dy > Math.abs(dx)) {
+            dy > flickStart(key) && dy > Math.abs(dx)) {
             this._clearTimer(touch);
             this._preview.hide();
             touch.mode = 'flick';
