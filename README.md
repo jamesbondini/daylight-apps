@@ -39,6 +39,7 @@ The app shows these in the same groups, set by `CATEGORY=` in each app's `info`.
 | App     | Installed via                                                     | Setup step |
 |---------|-------------------------------------------------------------------|------------|
 | Flatpak | `apk add flatpak` (password prompt) + the Flathub remote for your user | Log out and in once so Flatpak apps show in the app grid |
+| Clipboard Tools | `apk add wl-clipboard` (password prompt), so terminal apps like Claude Code can copy and paste | None |
 
 Apps with `NEEDS=flatpak` in their `info` (everything from Flathub) say “Needs Flatpak” until it is
 installed, and their Install button opens the Flatpak page instead.

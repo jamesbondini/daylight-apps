@@ -1,0 +1,11 @@
+#!/bin/bash
+# Install wl-clipboard, the copy and paste commands for Wayland.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+if ! apk_present wl-clipboard; then
+  step "Installing wl-clipboard (asks for your password)"
+  as_root "$(apk_add_cmd wl-clipboard)"
+fi
+
+step "Done"
+info "Restart terminal apps that were open so they find wl-copy and wl-paste."

@@ -1,0 +1,5 @@
+NAME=Clipboard Tools
+SUMMARY=Lets terminal apps such as Claude Code and Neovim copy and paste (wl-copy and wl-paste).
+ICON=edit-paste-symbolic
+WEBSITE=https://github.com/bugaevc/wl-clipboard
+CATEGORY=setup
