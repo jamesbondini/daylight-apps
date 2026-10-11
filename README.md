@@ -5,7 +5,18 @@ modelled on Omarchy's `omarchy-install-*` / `omarchy-installed-*` / `omarchy-rem
 
 ## Getting started
 
-Install the dependencies (most are already present on Nura with GNOME):
+Run this in a terminal:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jamesbondini/daylight-apps/main/get.sh | bash
+```
+
+It installs the dependencies (asking for your password if any are missing), downloads
+Daylight Apps to `~/Projects/daylight-apps` and adds it to the app grid. Run it again to update.
+
+### Step by step
+
+Or do the same by hand. Install the dependencies (most are already present on Nura with GNOME):
 
 ```sh
 sudo apk add git python3 py3-gobject3 gtk4.0 libadwaita
