@@ -13,15 +13,21 @@ fi
 step "Running the official Claude Code installer"
 curl -fsSL https://claude.ai/install.sh | bash
 
-# Use the system ripgrep on musl, as Anthropic's docs recommend for Alpine.
-SETTINGS="$HOME/.claude/settings.json"
-step "Setting USE_BUILTIN_RIPGREP=0 in $SETTINGS"
+# A status line with the model name and how much of the context is used.
 mkdir -p "$HOME/.claude"
+step "Installing the status line script to ~/.claude/statusline.sh"
+install -m 755 "$(dirname "$(readlink -f "$0")")/statusline" "$HOME/.claude/statusline.sh"
+
+# Use the system ripgrep on musl, as Anthropic's docs recommend for Alpine.
+# Keeps any status line the user already set up.
+SETTINGS="$HOME/.claude/settings.json"
+step "Setting USE_BUILTIN_RIPGREP=0 and the status line in $SETTINGS"
 python3 - "$SETTINGS" <<'PY'
 import json, os, sys
 path = sys.argv[1]
 data = json.load(open(path)) if os.path.exists(path) and os.path.getsize(path) else {}
 data.setdefault("env", {}).setdefault("USE_BUILTIN_RIPGREP", "0")
+data.setdefault("statusLine", {"type": "command", "command": "sh ~/.claude/statusline.sh"})
 json.dump(data, open(path, "w"), indent=2)
 PY
 
