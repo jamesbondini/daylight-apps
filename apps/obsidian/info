@@ -5,3 +5,4 @@ WEBSITE=https://obsidian.md
 OPEN=md.obsidian.Obsidian
 OPEN_LABEL=Open
 CATEGORY=apps
+NEEDS=flatpak

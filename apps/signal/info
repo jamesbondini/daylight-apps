@@ -5,3 +5,4 @@ WEBSITE=https://signal.org
 OPEN=org.signal.Signal
 OPEN_LABEL=Open
 CATEGORY=apps
+NEEDS=flatpak

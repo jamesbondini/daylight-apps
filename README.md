@@ -34,9 +34,18 @@ cd ~/Projects/daylight-apps && git pull
 
 The app shows these in the same groups, set by `CATEGORY=` in each app's `info`.
 
+### Start Here
+
+| App     | Installed via                                                     | Setup step |
+|---------|-------------------------------------------------------------------|------------|
+| Flatpak | `apk add flatpak` (password prompt) + the Flathub remote for your user | Log out and in once so Flatpak apps show in the app grid |
+
+Apps with `NEEDS=flatpak` in their `info` (everything from Flathub) say “Needs Flatpak” until it is
+installed, and their Install button opens the Flatpak page instead.
+
 ### Apps
 
-Installed per user from Flathub.
+Installed per user from Flathub; install Flatpak (under Start Here) first.
 
 | App       | Flathub id                     | Setup step                                  |
 |-----------|--------------------------------|---------------------------------------------|
@@ -54,7 +63,7 @@ VPN, Leo, News and telemetry (Brave Origin has no musl build).
 
 | App         | Installed via                                                        | Setup step                              |
 |-------------|----------------------------------------------------------------------|-----------------------------------------|
-| Claude Code | Official native installer (`claude.ai/install.sh`, arm64-musl) + `libgcc libstdc++ ripgrep` | Opens `claude` in a terminal to sign in |
+| Claude Code | Official native installer (`claude.ai/install.sh`, arm64-musl) + `libgcc libstdc++ ripgrep wl-clipboard` | Opens `claude` in a terminal to sign in |
 | Neovim      | Flathub `io.neovim.nvim` + an `nvim` command in `~/.local/bin`        | Opens `nvim` in a terminal              |
 | VS Code     | Flathub `com.visualstudio.code`                                       | None                                    |
 

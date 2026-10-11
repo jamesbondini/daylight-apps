@@ -1,0 +1,12 @@
+#!/bin/bash
+# Exit 0 if Flatpak and the Flathub remote are set up; print a one-line status.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+cmd_present flatpak || exit 1
+flatpak remotes --user --columns=name 2>/dev/null | grep -qx flathub || exit 1
+status="v$(flatpak --version | awk '{print $2}') · Flathub added"
+# The app grid finds Flatpak apps through XDG_DATA_DIRS, set at login.
+case ":${XDG_DATA_DIRS:-}:" in
+  *flatpak/exports*) echo "$status" ;;
+  *) echo "$status · log out and in to finish" ;;
+esac

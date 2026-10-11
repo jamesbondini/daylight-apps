@@ -1,0 +1,12 @@
+#!/bin/bash
+# Install Flatpak from apk and add the Flathub remote for this user.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+ensure_flatpak
+
+step "Done"
+flatpak --version
+case ":${XDG_DATA_DIRS:-}:" in
+  *flatpak/exports*) info "Apps from Flathub can be installed now." ;;
+  *) info "Apps from Flathub can be installed now. Log out and in once so they show in the app grid." ;;
+esac

@@ -4,3 +4,4 @@ ICON=io.neovim.nvim nvim text-editor-symbolic
 WEBSITE=https://neovim.io
 SETUP_LABEL=Open in Terminal
 CATEGORY=developer
+NEEDS=flatpak

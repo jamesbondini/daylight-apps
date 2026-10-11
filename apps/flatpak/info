@@ -1,0 +1,5 @@
+NAME=Flatpak
+SUMMARY=Installs desktop apps from Flathub. Install this first: the apps marked “Needs Flatpak” use it.
+ICON=flatpak system-software-install-symbolic
+WEBSITE=https://flathub.org
+CATEGORY=setup

@@ -5,3 +5,4 @@ WEBSITE=https://brave.com
 OPEN=com.brave.Browser
 OPEN_LABEL=Open
 CATEGORY=apps
+NEEDS=flatpak

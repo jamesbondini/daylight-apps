@@ -39,8 +39,24 @@ apk_del_cmd() {
 
 flatpak_present() { flatpak info "$1" >/dev/null 2>&1; }
 
-# Flathub apps, installed per-user (no root needed).
+# Install Flatpak itself (asks for your password) and add the Flathub remote
+# for the user, if missing. Apps it installs show up in the app grid only after
+# logging out and in once, since that adds Flatpak's folders to XDG_DATA_DIRS.
+ensure_flatpak() {
+  if ! cmd_present flatpak; then
+    step "Installing Flatpak (asks for your password)"
+    as_root "$(apk_add_cmd flatpak)"
+    info "Log out and in once afterwards so Flatpak apps show in the app grid."
+  fi
+  if ! flatpak remotes --user --columns=name 2>/dev/null | grep -qx flathub; then
+    step "Adding the Flathub app source"
+    flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  fi
+}
+
+# Flathub apps, installed per-user (no root needed once Flatpak is present).
 flatpak_install_app() {
+  ensure_flatpak
   flatpak install --user -y --noninteractive flathub "$1"
 }
 flatpak_status() {

@@ -18,6 +18,9 @@ scripts):
   page.py    optional: Python module whose build(window) returns a widget
              (or None) shown on the app's page while it is installed, for
              settings such as Hardware Buttons'.
+
+NEEDS in info lists app ids (space-separated) that must be installed first;
+until they are, the app's Install button points to them instead.
 """
 
 import importlib.util
@@ -40,6 +43,7 @@ APP_DIRS = [ROOT / "apps", Path(GLib.get_user_config_dir()) / "daylight-apps" / 
 # CATEGORY values from info, in the order the main list shows them. Apps
 # without one go under "apps"; unknown categories follow, titled as written.
 CATEGORIES = {
+    "setup": ("Start Here", "Install these first; other apps need them."),
     "apps": ("Apps", "Desktop apps, installed from Flathub."),
     "developer": ("Developer Tools", "Editors and coding agents for the terminal."),
     "services": ("Services", "Run in the background; set up once with an account."),
@@ -63,6 +67,7 @@ class AppEntry:
         self.name = self.meta.get("NAME", self.id)
         self.summary = self.meta.get("SUMMARY", "")
         self.category = self.meta.get("CATEGORY", "apps")
+        self.needs = self.meta.get("NEEDS", "").split()
         self.installed = None  # None = unknown
         self.status = ""
         self.enabled = None  # None = unknown or not switchable
@@ -239,6 +244,11 @@ class AppPage(Adw.NavigationPage):
             link.add_css_class("flat")
             box.append(link)
 
+        # Shown while an app from NEEDS is missing
+        self.needs_banner = Adw.Banner(button_label="Show")
+        self.needs_banner.connect("button-clicked", lambda *_: self.show_missing())
+        box.append(self.needs_banner)
+
         # On/off switch for apps that have one
         self.switch_group = Adw.PreferencesGroup(visible=False)
         self.switch_row = Adw.SwitchRow(title="Turned On")
@@ -310,6 +320,10 @@ class AppPage(Adw.NavigationPage):
         else:
             self.status_label.set_label("Not installed")
 
+        missing = self.window.missing_needs(app)
+        self.needs_banner.set_title(f"Needs {' and '.join(a.name for a in missing)}, install it first")
+        self.needs_banner.set_revealed(bool(missing) and not app.installed)
+
         running = self.proc is not None
         self.switch_group.set_visible(bool(app.installed) and app.enabled is not None)
         if app.enabled is not None and not app.toggling:
@@ -342,7 +356,11 @@ class AppPage(Adw.NavigationPage):
             self.actions.append(b)
 
         if not app.installed:
-            add("Install", lambda: self.run("install", f"Installing {app.name}…"), "suggested-action")
+            if missing:
+                first = missing[0]
+                add(f"Install {first.name} First", lambda: self.window.show_app(first), "suggested-action")
+            else:
+                add("Install", lambda: self.run("install", f"Installing {app.name}…"), "suggested-action")
             return
         if app.script("setup"):
             add(app.meta.get("SETUP_LABEL", "Set Up"), lambda: self.run("setup", "Setting up…"), "suggested-action")
@@ -375,6 +393,10 @@ class AppPage(Adw.NavigationPage):
             self.extra_rows.append(row)
 
     # ---- actions ----
+
+    def show_missing(self):
+        if missing := self.window.missing_needs(self.app):
+            self.window.show_app(missing[0])
 
     def on_switch(self, row, _pspec):
         if not getattr(self, "syncing", False) and row.get_active() != self.app.enabled:
@@ -533,6 +555,7 @@ class Window(Adw.ApplicationWindow):
     def __init__(self, application):
         super().__init__(application=application, title="Daylight Apps", default_width=720, default_height=900)
         self.apps = load_apps()
+        self.by_id = {a.id: a for a in self.apps}
         self.rows = {}
         self.pages = {}
 
@@ -586,6 +609,10 @@ class Window(Adw.ApplicationWindow):
             self.pages[app.id] = AppPage(self, app)
         self.nav.push(self.pages[app.id])
 
+    def missing_needs(self, app):
+        """Apps from app's NEEDS that are known not to be installed."""
+        return [self.by_id[n] for n in app.needs if n in self.by_id and self.by_id[n].installed is False]
+
     def refresh_all(self):
         for app in self.apps:
             page = self.pages.get(app.id)
@@ -611,10 +638,17 @@ class Window(Adw.ApplicationWindow):
         elif app.installed:
             badge.set_label("Installed")
             badge.add_css_class("success")
+        elif app.installed is False and (missing := self.missing_needs(app)):
+            badge.set_label(f"Needs {missing[0].name}")
+            badge.add_css_class("dim-label")
         elif app.installed is False:
             badge.set_label("")
         if page:
             page.update()
+        # Apps that need this one show its state too.
+        for other in self.apps:
+            if app.id in other.needs and other.id in self.rows:
+                self.on_status(other)
 
     def on_row_switch(self, switch, _pspec, app):
         if not getattr(self, "syncing", False) and switch.get_active() != app.enabled:

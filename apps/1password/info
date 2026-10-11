@@ -5,3 +5,4 @@ WEBSITE=https://1password.com
 OPEN=com.onepassword.OnePassword
 OPEN_LABEL=Open
 CATEGORY=apps
+NEEDS=flatpak
