@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="12" x2="0" y2="84" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffbe6f"/>
+      <stop offset="1" stop-color="#ff7800"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" y1="84" x2="0" y2="116" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3d3846"/>
+      <stop offset="1" stop-color="#241f31"/>
+    </linearGradient>
+    <clipPath id="tile">
+      <rect x="12" y="12" width="104" height="104" rx="20"/>
+    </clipPath>
+  </defs>
+  <!-- bottom edge -->
+  <rect x="12" y="16" width="104" height="104" rx="20" fill="#1e1a26"/>
+  <g clip-path="url(#tile)">
+    <rect x="12" y="12" width="104" height="104" fill="url(#sky)"/>
+    <!-- sun rising over the horizon -->
+    <g stroke="#fff5c2" stroke-width="6" stroke-linecap="round">
+      <line x1="34.0" y1="76.2" x2="22.4" y2="73.1"/>
+      <line x1="39.4" y1="64.3" x2="29.6" y2="57.3"/>
+      <line x1="50.7" y1="56.1" x2="46.0" y2="45.1"/>
+      <line x1="64" y1="53" x2="64" y2="41"/>
+      <line x1="77.3" y1="56.1" x2="82.0" y2="45.1"/>
+      <line x1="88.6" y1="64.3" x2="98.4" y2="57.3"/>
+      <line x1="94.0" y1="76.2" x2="105.6" y2="73.1"/>
+    </g>
+    <circle cx="64" cy="84" r="23" fill="#fff5c2"/>
+    <rect x="12" y="84" width="104" height="32" fill="url(#ground)"/>
+    <rect x="12" y="84" width="104" height="2" fill="#ffffff" opacity="0.15"/>
+    <!-- apps -->
+    <g fill="#ffffff">
+      <rect x="35" y="94" width="14" height="14" rx="4" opacity="0.85"/>
+      <rect x="57" y="94" width="14" height="14" rx="4" opacity="0.85"/>
+      <rect x="79" y="94" width="14" height="14" rx="4" opacity="0.85"/>
+    </g>
+  </g>
+</svg>
