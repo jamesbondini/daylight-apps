@@ -50,9 +50,10 @@
         <choice value="light"/>
         <choice value="dark"/>
         <choice value="mono"/>
+        <choice value="mono-dark"/>
       </choices>
       <default>'mono'</default>
-      <summary>Key colors: mono is high contrast black and white, for monochrome screens, and inverts with the system dark style</summary>
+      <summary>Key colors: mono is high contrast black and white, for monochrome screens, and inverts with the system dark style; mono-dark is always white on black</summary>
     </key>
     <key name="voice-engine" type="s">
       <choices>

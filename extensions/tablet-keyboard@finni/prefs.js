@@ -5,7 +5,7 @@ import Gtk from 'gi://Gtk';
 
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-const SCHEMES = ['mono', 'system', 'light', 'dark'];
+const SCHEMES = ['mono', 'mono-dark', 'system', 'light', 'dark'];
 const ENGINES = ['whisper', 'parakeet'];
 // Installed by the Daylight Apps "Voice Typing" app
 const VOICE_HELPER = GLib.build_filenamev(
@@ -54,8 +54,8 @@ export default class TabletKeyboardPreferences extends ExtensionPreferences {
 
         const scheme = new Adw.ComboRow({
             title: 'Theme',
-            subtitle: 'Monochrome is black and white with high contrast, for the Daylight screen, and inverts with the system dark style',
-            model: Gtk.StringList.new(['Monochrome', 'Follow system', 'Light', 'Dark']),
+            subtitle: 'Monochrome is black and white with high contrast, for the Daylight screen, and inverts with the system dark style. Monochrome dark is always white on black',
+            model: Gtk.StringList.new(['Monochrome', 'Monochrome dark', 'Follow system', 'Light', 'Dark']),
             selected: Math.max(0, SCHEMES.indexOf(settings.get_string('color-scheme'))),
         });
         scheme.connect('notify::selected',

@@ -1056,10 +1056,15 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         const hints = this._contentHint ?? 0;
         if (hints & Hint.UPPERCASE)
             return true;
-        if (!this._textAssist() || !this._settings.get_boolean('auto-capitalize'))
+        if (!this._settings.get_boolean('auto-capitalize'))
             return false;
 
         const text = this._history;
+        // In terminals only after a sentence, so commands stay lowercase
+        if (this._isTerminal())
+            return /[.!?]\s+$/.test(text);
+        if (!this._textAssist())
+            return false;
         if (hints & Hint.TITLECASE)
             return text.length === 0 || /\s$/.test(text);
         return text.length === 0 || /[.!?]\s+$/.test(text) || /\n$/.test(text);
@@ -1380,14 +1385,25 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._lastCorrection = null;
 
         // Double-tap space: replace the first space with ". "
-        if (this._textAssist() && this._mods.size === 0 && !this._selection &&
+        const terminal = this._isTerminal();
+        if ((terminal || this._textAssist()) && this._mods.size === 0 && !this._selection &&
             this._settings.get_boolean('double-space-period') &&
             now - this._lastSpaceTime < DOUBLE_SPACE_MS &&
             text.endsWith(' ') && /[\p{L}\p{N}]$/u.test(text.slice(0, -1)) &&
-            this._canReplaceBack(1)) {
-            this._deleteBack();
-            this._noteDeleted();
-            this._commit('. ');
+            (terminal || this._canReplaceBack(1))) {
+            if (terminal) {
+                // Terminals don't report their text, so use key presses
+                // throughout, which arrive in order
+                this._sendCombo([], Clutter.KEY_BackSpace);
+                this._sendCombo([], Clutter.KEY_period);
+                this._sendCombo([], Clutter.KEY_space);
+                this._noteDeleted();
+                this._noteTyped('. ');
+            } else {
+                this._deleteBack();
+                this._noteDeleted();
+                this._commit('. ');
+            }
             this._lastSpaceTime = 0;
         } else {
             const fix = this._autocorrect();
@@ -1525,6 +1541,21 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         add('|', text('|'));
         add('/', text('/'));
         add('-', text('-'));
+
+        // Paste, with Ctrl+Shift+V in terminals where Ctrl+V means something else
+        const paste = new St.Button({
+            style_class: 'tk-tool',
+            child: new St.Icon({style_class: 'tk-shortcut-icon', icon_name: 'edit-paste-symbolic'}),
+            x_expand: true,
+            can_focus: false,
+        });
+        paste.connect('clicked', () => {
+            const ctrl = Clutter.KEY_Control_L;
+            this._sendCombo(this._isTerminal() ? [ctrl, Clutter.KEY_Shift_L] : [ctrl], Clutter.KEY_v);
+            this._forgetContext();
+        });
+        toolbar.add_child(paste);
+
         add('←', key(Clutter.KEY_Left));
         add('↑', key(Clutter.KEY_Up));
         add('↓', key(Clutter.KEY_Down));
