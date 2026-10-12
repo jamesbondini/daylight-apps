@@ -144,7 +144,7 @@ gnome_ext_enabled() {
 
 # Voice typing engine picked in the Tablet Keyboard settings (whisper or parakeet)
 voice_engine() {
-  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@finni/schemas"
+  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@jamesbondini/schemas"
   gsettings --schemadir "$schemas" get org.gnome.shell.extensions.tablet-keyboard voice-engine \
     2>/dev/null | tr -d "'" | grep -x 'whisper\|parakeet' || echo whisper
 }
@@ -162,5 +162,5 @@ schema = src.lookup("org.gnome.shell.extensions.tablet-keyboard", False)
 if schema and schema.has_key("voice-words"):
     for w in Gio.Settings.new_full(schema, None, None).get_strv("voice-words"):
         print(w)
-' "$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@finni/schemas" 2>/dev/null
+' "$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@jamesbondini/schemas" 2>/dev/null
 }

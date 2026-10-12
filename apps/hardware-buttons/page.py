@@ -5,12 +5,12 @@ from pathlib import Path
 from gi.repository import Adw, Gio, GLib, Gtk
 
 SCHEMA = "org.gnome.shell.extensions.hardware-buttons"
-SCHEMA_DIR = Path(GLib.get_user_data_dir()) / "gnome-shell/extensions/hardware-buttons@finni/schemas"
+SCHEMA_DIR = Path(GLib.get_user_data_dir()) / "gnome-shell/extensions/hardware-buttons@jamesbondini/schemas"
 
 BUTTONS = [("button1", "Button 1"), ("button2", "Button 2")]
 KINDS = [("press", "Press"), ("hold", "Hold")]
 
-# Keep the names in sync with ACTIONS in extensions/hardware-buttons@finni/extension.js
+# Keep the names in sync with ACTIONS in extensions/hardware-buttons@jamesbondini/extension.js
 ACTIONS = [
     ("GNOME Shell", [
         ("overview", "Overview", "view-grid-symbolic"),

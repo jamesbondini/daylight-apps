@@ -37,7 +37,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk, Pango  # noqa: E402
 
-APP_ID = "dev.finni.DaylightApps"
+APP_ID = "io.github.jamesbondini.DaylightApps"
 ROOT = Path(__file__).resolve().parent
 APP_DIRS = [ROOT / "apps", Path(GLib.get_user_config_dir()) / "daylight-apps" / "apps"]
 # CATEGORY values from info, in the order the main list shows them. Apps

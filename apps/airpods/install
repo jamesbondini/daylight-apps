@@ -3,7 +3,7 @@
 # the AirPods itself through BlueZ, so there is nothing else to build or run.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-UUID=airpods@finni
+UUID=airpods@jamesbondini
 SRC="$(dirname "$(readlink -f "$0")")/../../extensions/$UUID"
 DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
 

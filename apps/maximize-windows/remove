@@ -2,7 +2,7 @@
 # Disable and remove the maximize-new-windows extension.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-UUID=maximize-new-windows@finni
+UUID=maximize-new-windows@jamesbondini
 
 step "Disabling extension"
 gnome_ext_set_enabled "$UUID" false

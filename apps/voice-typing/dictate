@@ -15,7 +15,7 @@ set -u
 
 MODELS="${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing"
 
-# Model files; keep in sync with MODELS in tablet-keyboard@finni/voice.js
+# Model files; keep in sync with MODELS in tablet-keyboard@jamesbondini/voice.js
 model_file() {
   case "$1" in
     whisper)  echo ggml-base.en.bin ;;

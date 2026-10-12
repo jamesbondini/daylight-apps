@@ -3,5 +3,5 @@
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
 step "Disabling extension"
-gnome_ext_set_enabled tablet-keyboard@finni false
+gnome_ext_set_enabled tablet-keyboard@jamesbondini false
 info "Off. The stock GNOME keyboard is back."

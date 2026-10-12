@@ -4,9 +4,10 @@ set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications"
+"$DIR/lib/migrate-ids.sh"
 ln -sf "$DIR/daylight-apps.py" "$HOME/.local/bin/daylight-apps"
 
-cat > "$HOME/.local/share/applications/dev.finni.DaylightApps.desktop" <<DESKTOP
+cat > "$HOME/.local/share/applications/io.github.jamesbondini.DaylightApps.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=Daylight Apps

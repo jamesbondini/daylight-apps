@@ -2,7 +2,7 @@
 # Install and enable the bundled maximize-new-windows GNOME Shell extension.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-UUID=maximize-new-windows@finni
+UUID=maximize-new-windows@jamesbondini
 SRC="$(dirname "$(readlink -f "$0")")/../../extensions/$UUID"
 DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
 

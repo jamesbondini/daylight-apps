@@ -22,7 +22,7 @@ gi.require_version("Gio", "2.0")
 gi.require_version("GioUnix", "2.0")
 from gi.repository import Gio, GioUnix, GLib
 
-APP_ID = "dev.finni.CrashHelper"
+APP_ID = "io.github.jamesbondini.CrashHelper"
 
 # See systemd.journal-fields(7)
 COREDUMP_MESSAGE_ID = "fc2e22bc6ee647b6b90729ab34a250b1"

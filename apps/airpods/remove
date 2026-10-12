@@ -2,7 +2,7 @@
 # Disable and remove the AirPods extension.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-UUID=airpods@finni
+UUID=airpods@jamesbondini
 
 step "Disabling extension"
 gnome_ext_set_enabled "$UUID" false

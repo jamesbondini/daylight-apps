@@ -100,7 +100,7 @@ export default class TabletKeyboardPreferences extends ExtensionPreferences {
             title: 'Voice dictionary',
             description: 'Names and special words voice typing should know and ' +
                 'spell your way. If a word keeps coming out wrong, add what it ' +
-                'is heard as after an equals sign: Finni = finny, funny',
+                'is heard as after an equals sign: Daylight = day light, delight',
         });
 
         const add = new Adw.EntryRow({title: 'Add a word', show_apply_button: true});

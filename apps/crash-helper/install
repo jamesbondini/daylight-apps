@@ -23,7 +23,7 @@ cp "$DIR"/skill/* "$SKILL"/
 # GNOME Shell only shows notifications from apps it has a desktop file for
 step "Adding a hidden desktop entry for its notifications"
 mkdir -p "$HOME/.local/share/applications"
-cat > "$HOME/.local/share/applications/dev.finni.CrashHelper.desktop" <<DESKTOP
+cat > "$HOME/.local/share/applications/io.github.jamesbondini.CrashHelper.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=Crash Helper

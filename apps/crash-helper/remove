@@ -16,7 +16,7 @@ for cmd in crash-diagnose crash-mute; do
   fi
 done
 rm -rf "$HOME/.claude/skills/diagnose-crash"
-rm -f "$HOME/.local/share/applications/dev.finni.CrashHelper.desktop"
+rm -f "$HOME/.local/share/applications/io.github.jamesbondini.CrashHelper.desktop"
 
 step "Done"
 info "Crashes are still recorded; see them with: coredumpctl list"

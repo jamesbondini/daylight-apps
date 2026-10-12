@@ -2,7 +2,7 @@
 # Install and enable the bundled Tablet Keyboard GNOME Shell extension.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-UUID=tablet-keyboard@finni
+UUID=tablet-keyboard@jamesbondini
 SRC="$(dirname "$(readlink -f "$0")")/../../extensions/$UUID"
 DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
 

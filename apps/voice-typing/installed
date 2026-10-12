@@ -6,7 +6,7 @@ DEST="${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing"
 [ -x "$DEST/dictate" ] || exit 1
 if ! cmd_present whisper-cli; then
   echo "whisper.cpp missing, press Update"
-elif ! gnome_ext_enabled tablet-keyboard@finni; then
+elif ! gnome_ext_enabled tablet-keyboard@jamesbondini; then
   echo "Install Tablet Keyboard for the microphone key"
 else
   engine=$(voice_engine)

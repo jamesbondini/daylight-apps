@@ -2,7 +2,7 @@
 # Install and enable the bundled two-finger-scroll GNOME Shell extension.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-UUID=two-finger-scroll@finni
+UUID=two-finger-scroll@jamesbondini
 SRC="$(dirname "$(readlink -f "$0")")/../../extensions/$UUID"
 DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
 
