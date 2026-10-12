@@ -99,7 +99,12 @@ def on_activate(app):
     stream = Gio.DataInputStream.new(GioUnix.InputStream.new(proc.stdout.fileno(), False))
 
     def on_line(source, result):
-        line, _ = source.read_line_finish_utf8(result)
+        try:
+            line, _ = source.read_line_finish_utf8(result)
+        except GLib.Error as e:
+            # Skip a line that is not UTF-8; any other error ends the stream
+            # (an uncaught one would leave us running but deaf)
+            line = "" if e.matches(GLib.convert_error_quark(), GLib.ConvertError.ILLEGAL_SEQUENCE) else None
         if line is None:
             app.quit()  # journalctl went away; systemd restarts us
             return

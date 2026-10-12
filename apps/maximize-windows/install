@@ -6,9 +6,20 @@ UUID=maximize-new-windows@jamesbondini
 SRC="$(dirname "$(readlink -f "$0")")/../../extensions/$UUID"
 DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
 
+# Update leaves an extension the user turned off switched off
+WAS_OFF=
+[ -f "$DEST/extension.js" ] && ! gnome_ext_enabled "$UUID" && WAS_OFF=1
+
 step "Copying extension to $DEST"
+rm -rf "$DEST"
 mkdir -p "$DEST"
-cp "$SRC"/* "$DEST"/
+cp -r "$SRC"/. "$DEST"/
+
+if [ -n "$WAS_OFF" ]; then
+  step "Done"
+  info "Updated. It is still turned off; use the switch above to turn it on."
+  exit 0
+fi
 
 step "Enabling extension"
 gnome_ext_set_enabled "$UUID" true

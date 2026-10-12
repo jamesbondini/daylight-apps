@@ -17,7 +17,12 @@ main() {
   done
   if [ ${#missing[@]} -gt 0 ]; then
     echo "==> Installing ${missing[*]} (asks for your password)"
-    sudo apk add "${missing[@]}"
+    # apk can exit non-zero over an unrelated broken package, so check the
+    # result instead (lib/common.sh's apk_add_cmd, which is not here yet)
+    sudo apk add "${missing[@]}" || true
+    for pkg in "${missing[@]}"; do
+      apk info -e "$pkg" >/dev/null 2>&1 || { echo "!! $pkg did not install" >&2; exit 1; }
+    done
   fi
 
   if [ -d "$DEST/.git" ]; then

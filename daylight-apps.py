@@ -73,6 +73,7 @@ class AppEntry:
         self.enabled = None  # None = unknown or not switchable
         self.extras = []  # (id, title, subtitle, present)
         self.toggling = False
+        self.checking = False  # an `installed` check is running
 
     def script(self, name):
         p = self.path / name
@@ -98,6 +99,12 @@ def load_apps():
                 if (p / "info").exists() and (p / "install").exists():
                     apps[p.name] = AppEntry(p)  # user dir overrides built-ins
     return sorted(apps.values(), key=lambda a: a.name.lower())
+
+
+def text(data):
+    """Script output (GLib.Bytes) as text. Bytes that are not UTF-8 must not
+    lose the rest, as communicate_utf8 would."""
+    return data.get_data().decode("utf-8", "replace") if data else ""
 
 
 def script_env():
@@ -144,12 +151,15 @@ def check_installed(app, callback):
         app.installed, app.status, app.enabled, app.extras = False, "", None, []
         callback(app)
         return
+    app.checking = True
 
     def done(proc, res):
+        app.checking = False
         try:
-            _, out, _ = proc.communicate_utf8_finish(res)
+            _, out, _ = proc.communicate_finish(res)
             app.installed = proc.get_successful()
-            app.status = (out or "").strip().splitlines()[0] if (out or "").strip() else ""
+            out = text(out).strip()
+            app.status = out.splitlines()[0] if out else ""
         except GLib.Error:
             app.installed, app.status = False, ""
         app.enabled = None
@@ -162,35 +172,46 @@ def check_installed(app, callback):
         else:
             after_extras()
 
-    proc.communicate_utf8_async(None, None, done)
+    proc.communicate_async(None, None, done)
 
 
 def check_extras(app, callback):
     """Run the app's `extras` script asynchronously."""
     launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
     launcher.set_environ(script_env())
-    proc = launcher.spawnv([str(app.path / "extras")])
+    try:
+        proc = launcher.spawnv([str(app.path / "extras")])
+    except GLib.Error:  # removed or made non-executable since the check
+        app.extras = []
+        callback()
+        return
 
     def done(proc, res):
         try:
-            _, out, _ = proc.communicate_utf8_finish(res)
+            _, out, _ = proc.communicate_finish(res)
+            out = text(out)
         except GLib.Error:
             out = ""
         app.extras = []
-        for line in (out or "").splitlines():
+        for line in out.splitlines():
             parts = line.split("|")
             if len(parts) == 4:
                 app.extras.append((parts[0], parts[1], parts[2], parts[3].strip() == "yes"))
         callback()
 
-    proc.communicate_utf8_async(None, None, done)
+    proc.communicate_async(None, None, done)
 
 
 def check_enabled(app, callback):
     """Run the app's `enabled` script asynchronously."""
     launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE)
     launcher.set_environ(script_env())
-    proc = launcher.spawnv([str(app.path / "enabled")])
+    try:
+        proc = launcher.spawnv([str(app.path / "enabled")])
+    except GLib.Error:
+        app.enabled = None
+        callback(app)
+        return
 
     def done(proc, res):
         try:
@@ -269,6 +290,7 @@ class AppPage(Adw.NavigationPage):
         # Settings from the app's page.py, built once it is installed
         self.custom_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, visible=False)
         self.custom = None
+        self.custom_tried = False
         box.append(self.custom_box)
 
         # Optional parts, e.g. downloadable models
@@ -343,10 +365,14 @@ class AppPage(Adw.NavigationPage):
         self.switch_row.set_sensitive(not running and not app.toggling)
         self.switch_row.set_subtitle("Switching…" if app.toggling else app.status)
         self.update_extras(running or app.toggling)
-        if app.installed and not self.custom:
+        if app.installed and not self.custom and not self.custom_tried:
+            # Once per install: a page.py that fails or returns None is not re-run on every update
+            self.custom_tried = True
             self.custom = build_custom_page(app, self.window)
             if self.custom:
                 self.custom_box.append(self.custom)
+        elif app.installed is False:
+            self.custom_tried = False
         self.custom_box.set_visible(bool(app.installed) and self.custom is not None)
 
         while child := self.actions.get_first_child():
@@ -476,8 +502,10 @@ class AppPage(Adw.NavigationPage):
             return
         try:
             line, _ = stream.read_line_finish_utf8(res)
-        except GLib.Error:
-            line = None
+        except GLib.Error as e:
+            # A line that is not UTF-8 is consumed and skipped; stopping here
+            # would leave the pipe undrained and the script blocked on it.
+            line = "" if e.matches(GLib.convert_error_quark(), GLib.ConvertError.ILLEGAL_SEQUENCE) else None
         if line is None:
             self.step_done()
             return
@@ -626,10 +654,10 @@ class Window(Adw.ApplicationWindow):
     def refresh_all(self):
         for app in self.apps:
             page = self.pages.get(app.id)
-            if not (page and page.proc):
+            if not (page and page.proc) and not app.checking:
                 check_installed(app, self.on_status)
 
-    def on_status(self, app):
+    def on_status(self, app, _seen=None):
         row, icon, badge, switch = self.rows[app.id]
         icon.set_from_icon_name(app.icon_name(self))
         page = self.pages.get(app.id)
@@ -655,10 +683,11 @@ class Window(Adw.ApplicationWindow):
             badge.set_label("")
         if page:
             page.update()
-        # Apps that need this one show its state too.
+        # Apps that need this one show its state too (once each, even if NEEDS loops).
+        seen = (_seen or set()) | {app.id}
         for other in self.apps:
-            if app.id in other.needs and other.id in self.rows:
-                self.on_status(other)
+            if app.id in other.needs and other.id in self.rows and other.id not in seen:
+                self.on_status(other, seen)
 
     def on_row_switch(self, switch, _pspec, app):
         if not getattr(self, "syncing", False) and switch.get_active() != app.enabled:
@@ -684,10 +713,11 @@ class Window(Adw.ApplicationWindow):
 
         def done(proc, res):
             try:
-                _, out, _ = proc.communicate_utf8_finish(res)
+                _, out, _ = proc.communicate_finish(res)
+                out = text(out)
             except GLib.Error:
                 out = ""
-            lines = [ANSI_RE.sub("", l).strip() for l in (out or "").splitlines()]
+            lines = [ANSI_RE.sub("", l).strip() for l in out.splitlines()]
             lines = [l for l in lines if l and not l.startswith("==>")]
             if proc.get_successful():
                 self.toast(f"{app.name}: {lines[-1]}" if lines else f"{app.name} turned {'on' if on else 'off'}")
@@ -696,7 +726,7 @@ class Window(Adw.ApplicationWindow):
             app.toggling = False
             check_installed(app, self.on_status)
 
-        proc.communicate_utf8_async(None, None, done)
+        proc.communicate_async(None, None, done)
 
     def toast(self, text):
         self.toasts.add_toast(Adw.Toast(title=text, timeout=4))

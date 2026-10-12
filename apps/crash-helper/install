@@ -10,6 +10,10 @@ SKILL="$HOME/.claude/skills/diagnose-crash"
 
 cmd_present coredumpctl || fail "coredumpctl is missing, so crashes are not being recorded"
 
+# Update leaves the watcher off if the user turned it off
+WAS_OFF=
+[ -f "$UNIT_DIR/crash-helper.service" ] && ! systemctl --user is-enabled --quiet crash-helper.service && WAS_OFF=1
+
 step "Adding crash-diagnose and crash-mute to ~/.local/bin"
 mkdir -p "$HOME/.local/bin"
 ln -sf "$DIR/crash-diagnose" "$HOME/.local/bin/crash-diagnose"
@@ -50,6 +54,11 @@ RestartSec=5
 WantedBy=graphical-session.target
 UNIT
 systemctl --user daemon-reload
+if [ -n "$WAS_OFF" ]; then
+  step "Done"
+  info "Updated. Crash notifications are still off; use the switch above to turn them on."
+  exit 0
+fi
 systemctl --user enable --quiet crash-helper.service
 systemctl --user restart crash-helper.service
 
