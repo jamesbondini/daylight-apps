@@ -1,0 +1,22 @@
+#!/bin/bash
+# Stop the crash watcher and remove its files. Keeps the list of muted apps.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+DIR="$(dirname "$(readlink -f "$0")")"
+
+step "Stopping service"
+systemctl --user disable --now crash-helper.service 2>/dev/null || true
+rm -f "$HOME/.local/share/systemd/user/crash-helper.service"
+systemctl --user daemon-reload
+
+step "Removing commands, skill and desktop entry"
+for cmd in crash-diagnose crash-mute; do
+  if [ "$(readlink "$HOME/.local/bin/$cmd" 2>/dev/null)" = "$DIR/$cmd" ]; then
+    rm -f "$HOME/.local/bin/$cmd"
+  fi
+done
+rm -rf "$HOME/.claude/skills/diagnose-crash"
+rm -f "$HOME/.local/share/applications/dev.finni.CrashHelper.desktop"
+
+step "Done"
+info "Crashes are still recorded; see them with: coredumpctl list"

@@ -1,0 +1,8 @@
+#!/bin/bash
+# Diagnose the most recent crash of one of your own programs.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+pid=$(coredumpctl list --no-pager --no-legend -q _UID="$(id -u)" 2>/dev/null \
+  | tail -1 | awk '{print $5}') || true
+[ -n "$pid" ] || fail "No crashes recorded for your user. See: coredumpctl list"
+exec "$(dirname "$(readlink -f "$0")")/crash-diagnose" "$pid"

@@ -1,0 +1,30 @@
+#!/bin/bash
+# Silence Crash Helper notifications for one program, or list what is silenced.
+#   crash-mute                 list muted programs
+#   crash-mute <program>       mute it (a name or the binary's path)
+#   crash-mute <program> off   let it notify again
+set -euo pipefail
+
+MUTES="${XDG_STATE_HOME:-$HOME/.local/state}/daylight-apps/crash-mute"
+
+if [ $# -eq 0 ]; then
+  found=0
+  for f in "$MUTES"/* "$MUTES"/.*; do
+    [ -f "$f" ] || continue
+    echo "${f##*/}"; found=1
+  done
+  [ $found = 1 ] || echo "No programs muted."
+  exit 0
+fi
+
+# The watcher keys on the executable's file name
+name=${1##*/}
+if [ -z "$name" ] || [ "$name" = . ] || [ "$name" = .. ]; then
+  echo "Not a program name: $1" >&2; exit 1
+fi
+
+case "${2:-on}" in
+  on)  mkdir -p "$MUTES"; : > "$MUTES/$name"; echo "Muted crash notifications for $name." ;;
+  off) rm -f "$MUTES/$name"; echo "Crash notifications for $name are back on." ;;
+  *)   echo "Usage: crash-mute [<program> [on|off]]" >&2; exit 1 ;;
+esac

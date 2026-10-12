@@ -77,8 +77,15 @@ VPN, Leo, News and telemetry (Brave Origin has no musl build).
 | App         | Installed via                                                        | Setup step                              |
 |-------------|----------------------------------------------------------------------|-----------------------------------------|
 | Claude Code | Official native installer (`claude.ai/install.sh`, arm64-musl) + `libgcc libstdc++ ripgrep wl-clipboard` | Opens `claude` in a terminal to sign in |
+| Crash Helper | Systemd user service following systemd-coredump, plus `crash-diagnose`, `crash-mute` and a `diagnose-crash` skill for Claude Code (needs Claude Code) | None; “Diagnose Last Crash” opens the latest |
 | Neovim      | Flathub `io.neovim.nvim` + an `nvim` command in `~/.local/bin`        | Opens `nvim` in a terminal              |
 | VS Code     | Flathub `com.visualstudio.code`                                       | None                                    |
+
+Crash Helper, after Omarchy's crash capture: when one of your programs crashes, a notification
+offers to diagnose it. Tapping it opens Claude Code in Console with the crash details and the
+`diagnose-crash` skill, which reads the core dump, journal and package history and reports what
+happened. `crash-diagnose <pid>` does the same for any crash in `coredumpctl list`;
+`crash-mute <program>` silences one program (`crash-mute <program> off` to undo).
 
 ### Services
 

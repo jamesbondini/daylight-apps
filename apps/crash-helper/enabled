@@ -1,0 +1,4 @@
+#!/bin/bash
+# Exit 0 if the crash watcher is turned on.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+systemctl --user is-enabled --quiet crash-helper.service

@@ -1,0 +1,58 @@
+#!/bin/bash
+# Install the crash watcher as a systemd user service, the crash commands in
+# ~/.local/bin and the diagnose-crash skill for Claude Code. Modelled on
+# Omarchy's omarchy-crash-watch.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+DIR="$(dirname "$(readlink -f "$0")")"
+UNIT_DIR="$HOME/.local/share/systemd/user"
+SKILL="$HOME/.claude/skills/diagnose-crash"
+
+cmd_present coredumpctl || fail "coredumpctl is missing, so crashes are not being recorded"
+
+step "Adding crash-diagnose and crash-mute to ~/.local/bin"
+mkdir -p "$HOME/.local/bin"
+ln -sf "$DIR/crash-diagnose" "$HOME/.local/bin/crash-diagnose"
+ln -sf "$DIR/crash-mute" "$HOME/.local/bin/crash-mute"
+
+step "Installing the diagnose-crash skill to $SKILL"
+rm -rf "$SKILL"
+mkdir -p "$SKILL"
+cp "$DIR"/skill/* "$SKILL"/
+
+# GNOME Shell only shows notifications from apps it has a desktop file for
+step "Adding a hidden desktop entry for its notifications"
+mkdir -p "$HOME/.local/share/applications"
+cat > "$HOME/.local/share/applications/dev.finni.CrashHelper.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Crash Helper
+Comment=Notifies you when an app crashes
+Exec=$DIR/crash-watch
+Icon=dialog-warning-symbolic
+NoDisplay=true
+DESKTOP
+
+step "Installing systemd user service"
+mkdir -p "$UNIT_DIR"
+cat > "$UNIT_DIR/crash-helper.service" <<UNIT
+[Unit]
+Description=Announce app crashes and offer a diagnosis with Claude Code
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=$DIR/crash-watch
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
+UNIT
+systemctl --user daemon-reload
+systemctl --user enable --quiet crash-helper.service
+systemctl --user restart crash-helper.service
+
+step "Done"
+info "Crashes now show a notification. Tap it to open Claude Code with the details."
+info "“Diagnose Last Crash” does the same for the most recent crash."

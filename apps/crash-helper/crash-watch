@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""Watch for crashes of the user's programs and offer a diagnosis.
+
+systemd-coredump journals every core dump under a known MESSAGE_ID with
+COREDUMP_* fields. Each crash becomes a notification; tapping it runs
+crash-diagnose, which opens Claude Code in a terminal with the details.
+Modelled on Omarchy's omarchy-crash-watch.
+
+Notifications go through GNOME Shell's GTK API (Gio.Notification) rather than
+org.freedesktop.Notifications, which nothing provides on the DC-1. That API
+needs a desktop file named after the app id, which `install` writes.
+"""
+
+import json
+import os
+import subprocess
+import time
+
+import gi
+
+gi.require_version("Gio", "2.0")
+gi.require_version("GioUnix", "2.0")
+from gi.repository import Gio, GioUnix, GLib
+
+APP_ID = "dev.finni.CrashHelper"
+
+# See systemd.journal-fields(7)
+COREDUMP_MESSAGE_ID = "fc2e22bc6ee647b6b90729ab34a250b1"
+
+# Crash loops dump core repeatedly, so announce each program at most once a minute
+DEDUPE_SECONDS = int(os.environ.get("CRASH_HELPER_DEDUPE_SECONDS", "60"))
+
+# Muted by crash-mute, one empty file per program name
+MUTES = os.path.join(
+    os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"),
+    "daylight-apps", "crash-mute")
+
+DIAGNOSE = os.path.join(os.path.dirname(os.path.realpath(__file__)), "crash-diagnose")
+
+last_notified = {}
+
+
+def diagnose(_action, param):
+    # Crash details as separate argv words, so a hostile process name can't be
+    # reparsed as a command
+    subprocess.Popen([DIAGNOSE, *param.unpack()], start_new_session=True,
+                     stdin=subprocess.DEVNULL)
+
+
+def on_entry(app, line):
+    try:
+        e = json.loads(line)
+    except ValueError:
+        return
+    field = lambda k: e[k] if isinstance(e.get(k), str) and e[k] else "-"
+    uid, pid = field("COREDUMP_UID"), field("COREDUMP_PID")
+    comm, exe, sig = field("COREDUMP_COMM"), field("COREDUMP_EXE"), field("COREDUMP_SIGNAL_NAME")
+
+    # Only this user's crashes; a system daemon dumping core is a different matter
+    if not pid.isdigit() or uid != str(os.getuid()):
+        return
+
+    # comm is cut to 15 characters, so prefer the executable's name
+    name = os.path.basename(exe if exe.startswith("/") else comm)
+    if name in ("", "-", ".", ".."):
+        name = "unknown"
+
+    # Never announce our own machinery, or the agent we hand crashes to
+    if name.startswith("crash-") or name == "claude":
+        return
+    if os.path.isfile(os.path.join(MUTES, name)):
+        return
+    if time.monotonic() - last_notified.get(name, -DEDUPE_SECONDS) < DEDUPE_SECONDS:
+        return
+    last_notified[name] = time.monotonic()
+
+    target = GLib.Variant("as", [pid, comm, exe, sig])
+    n = Gio.Notification.new(f"{name} crashed")
+    n.set_body("Tap to find out why with Claude Code")
+    n.set_icon(Gio.ThemedIcon.new("dialog-warning-symbolic"))
+    n.set_priority(Gio.NotificationPriority.HIGH)
+    n.set_default_action_and_target("app.diagnose", target)
+    n.add_button_with_target("Diagnose", "app.diagnose", target)
+    # One notification per program, so a newer crash replaces the older one
+    app.send_notification(f"crash-{name}", n)
+
+
+def on_activate(app):
+    app.hold()  # run until journalctl goes away, with no window
+
+    action = Gio.SimpleAction.new("diagnose", GLib.VariantType("as"))
+    action.connect("activate", diagnose)
+    app.add_action(action)
+
+    # -n 0 so a restart does not re-announce crashes already dealt with
+    proc = subprocess.Popen(
+        ["journalctl", "-f", "-n", "0", "-o", "json", f"MESSAGE_ID={COREDUMP_MESSAGE_ID}"],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    stream = Gio.DataInputStream.new(GioUnix.InputStream.new(proc.stdout.fileno(), False))
+
+    def on_line(source, result):
+        line, _ = source.read_line_finish_utf8(result)
+        if line is None:
+            app.quit()  # journalctl went away; systemd restarts us
+            return
+        on_entry(app, line)
+        source.read_line_async(GLib.PRIORITY_DEFAULT, None, on_line)
+
+    stream.read_line_async(GLib.PRIORITY_DEFAULT, None, on_line)
+
+
+if __name__ == "__main__":
+    app = Gio.Application(application_id=APP_ID)
+    app.connect("activate", on_activate)
+    raise SystemExit(app.run(None) or 1)
