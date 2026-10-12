@@ -67,6 +67,8 @@ function centerPivot() {
 // Height profile of the voice key's level bars, tallest in the middle
 const VOICE_BARS = [0.45, 0.75, 1, 0.75, 0.45];
 const VOICE_LEVEL_MS = 60;
+// How often the mic key updates a model download's percentage
+const VOICE_PROGRESS_MS = 500;
 
 // Color schemes besides light, which has no class
 const THEME_CLASSES = ['tk-dark', 'tk-mono', 'tk-mono-dark'];
@@ -159,6 +161,8 @@ class TabletKeyActor extends St.Widget {
             if (spec.kind === 'voice') {
                 this._meter = new VoiceMeter();
                 this.add_child(this._meter);
+                this._progress = new St.Label({style_class: 'tk-fn-label', visible: false});
+                this.add_child(this._progress);
             }
         } else if (spec.kind !== 'space') {
             this._label = new St.Label({
@@ -200,8 +204,8 @@ class TabletKeyActor extends St.Widget {
     }
 
     // The mic key shows the microphone level while recording, a wave while
-    // transcribing, a breathing download icon while fetching a model and a
-    // red crossed-out microphone when it failed
+    // transcribing, a breathing download icon and then the percentage while
+    // fetching a model, and a red crossed-out microphone when it failed
     setVoiceState(state) {
         if (state === this._voiceState)
             return;
@@ -220,6 +224,7 @@ class TabletKeyActor extends St.Widget {
 
         const busy = state === 'recording' || state === 'transcribing';
         this._icon.visible = !busy;
+        this._progress.visible = false;
         this._meter.visible = busy;
         if (state === 'transcribing')
             this._meter.startWave();
@@ -243,6 +248,20 @@ class TabletKeyActor extends St.Widget {
         this._meter?.setLevel(level);
     }
 
+    // progress from 0 to 1 replaces the download icon; null brings it back
+    setVoiceProgress(progress) {
+        if (!this._progress || this._voiceState !== 'downloading')
+            return;
+        const known = progress !== null && progress > 0;
+        if (known)
+            this._progress.text = `${Math.floor(progress * 100)}%`;
+        this._progress.visible = known;
+        this._icon.visible = !known;
+        // The breathing would go on redrawing the hidden icon
+        if (known)
+            this._icon.remove_all_transitions();
+    }
+
     applyMetrics(m) {
         if (this._label) {
             // Longer keys like .com get the smaller function key size
@@ -257,6 +276,8 @@ class TabletKeyActor extends St.Widget {
         if (this._icon)
             this._icon.icon_size = m.icon;
         this._meter?.setSize(m.icon);
+        if (this._progress)
+            this._progress.style = `font-size: ${m.fn}px;`;
     }
 
     vfunc_allocate(box) {
@@ -278,6 +299,8 @@ class TabletKeyActor extends St.Widget {
             place(this._icon, height / 2);
         if (this._meter)
             place(this._meter, height / 2);
+        if (this._progress)
+            place(this._progress, height / 2);
         if (this._alt) {
             // Small swipe-down character on top, main one a bit lower
             const [, , , altH] = this._alt.get_preferred_size();
@@ -683,6 +706,15 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._dictation = new Dictation({
             engine: this._settings.get_string('voice-engine'),
             words: () => this._settings.get_strv('voice-words'),
+            options: () => {
+                const options = [];
+                const language = this._settings.get_string('voice-language');
+                if (language)
+                    options.push('--language', language);
+                if (this._settings.get_boolean('voice-battery-saver'))
+                    options.push('--battery-saver');
+                return options;
+            },
             onChanged: () => this._syncVoice(),
             onText: text => this._typeDictation(text),
         });
@@ -705,6 +737,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         this._preview?.destroy();
         this._preview = null;
         this._stopVoiceLevels();
+        this._stopVoiceProgress();
         this._dictation?.destroy();
         this._dictation = null;
         if (this._surroundingRetryId) {
@@ -2125,6 +2158,21 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         for (const key of keys)
             key.setVoiceState(state);
 
+        if (state !== 'downloading') {
+            this._stopVoiceProgress();
+        } else if (!this._voiceProgressId) {
+            const poll = () => {
+                const progress = this._dictation?.downloadProgress() ?? null;
+                for (const key of this._grid.keys) {
+                    if (key.spec.kind === 'voice')
+                        key.setVoiceProgress(progress);
+                }
+                return GLib.SOURCE_CONTINUE;
+            };
+            poll();
+            this._voiceProgressId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, VOICE_PROGRESS_MS, poll);
+        }
+
         if (state !== 'recording') {
             this._stopVoiceLevels();
         } else if (!this._voiceLevelId) {
@@ -2136,6 +2184,13 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
                 }
                 return GLib.SOURCE_CONTINUE;
             });
+        }
+    }
+
+    _stopVoiceProgress() {
+        if (this._voiceProgressId) {
+            GLib.source_remove(this._voiceProgressId);
+            this._voiceProgressId = 0;
         }
     }
 

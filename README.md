@@ -116,7 +116,7 @@ after installing one for the first time.
 | Maximize New Windows | Opens new windows maximized, see [dc-1-pmos#10](https://github.com/denysvitali/dc-1-pmos/issues/10) |
 | Tablet Keyboard      | iPad-style on-screen keyboard. Follows the GNOME input source and adds an Esc/Tab/Ctrl/arrows row in terminals; hold the hide key for settings (height, split keyboard, autocorrect) |
 | Two-Finger Scroll    | Dragging two fingers over Ghostty, Console or another terminal scrolls it like a touchpad, with momentum |
-| Voice Typing         | Add-on for Tablet Keyboard: `apk add whisper.cpp` + a `dictate` helper that adds a microphone key (hold to talk, or tap to start and stop). Engine is picked in the keyboard settings: Whisper `base.en` (English, 142 MB, downloaded on install) or Parakeet TDT 0.6B v3 (25 European languages, 416 MB, from the Speech Models list). "Try It" records in a terminal |
+| Voice Typing         | Add-on for Tablet Keyboard: `apk add whisper.cpp` + a `dictate` helper that adds a microphone key (hold to talk, or tap to start and stop). Nothing is downloaded until you pick a model from the Speech Models list, which shows the space they use and lets you remove each one: Whisper base.en (English, recommended, 148 MB), multilingual Whisper tiny, base or small (99 languages, 78–488 MB) or Parakeet 0.6B v3 (25 European languages, recommended, 416 MB, or 669 MB at higher precision). Downloads are checked against their SHA-256, and the mic key shows their progress. The keyboard settings pick the model, a fixed language for multilingual Whisper, and a battery saver that uses the efficient CPU cores. The list lives in `apps/voice-typing/models`. "Try It" records in a terminal |
 
 ## Adding an app
 
@@ -133,7 +133,7 @@ Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
   These add an on/off switch to the app's row and page; the GNOME Shell extensions use them.
 - `page.py` (optional): a Python module whose `build(window)` returns a GTK widget (or `None`) shown on the
   app's page while it is installed, for settings like those of `apps/hardware-buttons/`.
-- `extras`, `extra-add`, `extra-remove` (optional, together): optional parts such as models. `extras` prints one `ID|Title|Subtitle|yes-or-no` line per part (yes when present); the page lists them under `EXTRAS_TITLE` (from `info`) with Download and Remove buttons that run `extra-add ID` and `extra-remove ID`.
+- `extras`, `extra-add`, `extra-remove` (optional, together): optional parts such as models. `extras` prints one `ID|Title|Subtitle|yes-or-no` line per part (yes when present), plus optionally one line without `|` that is shown under the group title (e.g. the space the parts use); the page lists them under `EXTRAS_TITLE` (from `info`) with Download and Remove buttons that run `extra-add ID` and `extra-remove ID`.
 
 Scripts source `lib/common.sh` for `step`, `info`, `fail`, `as_root` (one polkit prompt per
 call), `apk_present`, `apk_add_cmd`/`apk_del_cmd`, `flatpak_install_app`/`flatpak_status`/

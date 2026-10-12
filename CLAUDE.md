@@ -70,12 +70,14 @@ It sets `set -euo pipefail` and provides `step`/`info`/`fail` (the `==>` / inden
 `apps/<id>/` recipe in the `extensions` category. Some span both sides:
 - Hardware Buttons: settings UI is `apps/hardware-buttons/page.py`; the extension reads the same
   GSettings schema. `shell-keys` takes over/returns GNOME's own shortcuts for those keys.
-- Voice Typing is an add-on to Tablet Keyboard: `apps/voice-typing/dictate` is installed to
-  `~/.local/share/daylight-apps/voice-typing/` and the keyboard's `voice.js` runs it.
+- Voice Typing is an add-on to Tablet Keyboard: `apps/voice-typing/dictate` and the speech model
+  registry `apps/voice-typing/models` are installed to `~/.local/share/daylight-apps/voice-typing/`.
+  The keyboard's `voice.js` runs `dictate`; the keyboard (`voicemodels.js`) and the app's scripts
+  all read the installed `models`, so a model is added by adding a line there. Its `voice-engine`
+  setting stores a model ID; empty means the first downloaded model.
 
 Paired lists that must be kept in sync by hand (each side has a comment pointing at the other):
 - `ACTIONS` in `apps/hardware-buttons/page.py` ↔ `extensions/hardware-buttons@jamesbondini/extension.js`
-- model files in `apps/voice-typing/dictate` ↔ `MODELS` in `extensions/tablet-keyboard@jamesbondini/voice.js`
 
 **IDs**: extension UUIDs use `@jamesbondini`, app/desktop ids `io.github.jamesbondini.*`.
 `lib/migrate-ids.sh` (run by `install.sh`) moves old `@finni` / `dev.finni.*` installs over; keep it

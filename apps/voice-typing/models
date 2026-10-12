@@ -1,0 +1,17 @@
+# Speech models for voice typing, one per line:
+#   ID|ENGINE|LANGUAGE|BYTES|SHA256|TITLE|DESCRIPTION|URL
+# Installed next to dictate, and read from there by dictate, this app's
+# scripts and Tablet Keyboard (voicemodels.js), so a model added here
+# shows up everywhere. The keyboard's voice-engine setting stores the ID, so
+# don't rename one. ENGINE is whisper or parakeet (whisper.cpp's parakeet-cli
+# only loads the 0.6B architecture). LANGUAGE is Whisper's -l: a language
+# code, or auto for the keyboard's Language setting (detected by default).
+# BYTES and SHA256 are the file's, as listed on Hugging Face; the download is
+# checked against them. The file name is the last part of the URL.
+# When no model is picked, the first downloaded one in this order is used.
+whisper|whisper|en|147964211|a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002|Whisper base.en|Recommended for English. Quick, and spells the words in your voice dictionary best.|https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+whisper-tiny|whisper|auto|77691713|be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21|Whisper tiny|99 languages. The fastest and smallest, but makes more mistakes.|https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+whisper-base|whisper|auto|147951465|60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe|Whisper base|99 languages. Slower and less accurate in English than base.en.|https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+whisper-small|whisper|auto|487601967|1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b|Whisper small|99 languages. Much more accurate, but takes about four times as long as you spoke.|https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+parakeet|parakeet||415611879|8b205b8b39c6535e153de6fb11c51db46125d45c4f16ba496fe41a0fe71b885e|Parakeet 0.6B v3|Recommended for other languages. 25 European languages, detected automatically, with punctuation.|https://huggingface.co/ggml-org/parakeet-GGUF/resolve/main/ggml-parakeet-tdt-0.6b-v3-q4_k.bin
+parakeet-q8|parakeet||668757119|4d64e9e96c2792186d072fde0034df0ad670cf680a2f53069052ead827fd600e|Parakeet 0.6B v3 (high precision)|The same 25 languages, less compressed: a little more accurate, a bigger download.|https://huggingface.co/ggml-org/parakeet-GGUF/resolve/main/ggml-parakeet-tdt-0.6b-v3-q8_0.bin

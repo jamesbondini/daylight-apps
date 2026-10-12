@@ -5,11 +5,28 @@ import Gtk from 'gi://Gtk';
 
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
+import {VOICE_DIR, readModels, voiceFileSize} from './voicemodels.js';
+
 const SCHEMES = ['mono', 'mono-light', 'mono-dark', 'system', 'light', 'dark'];
-const ENGINES = ['whisper', 'parakeet'];
 // Installed by the Daylight Apps "Voice Typing" app
-const VOICE_HELPER = GLib.build_filenamev(
-    [GLib.get_user_data_dir(), 'daylight-apps', 'voice-typing', 'dictate']);
+const VOICE_HELPER = GLib.build_filenamev([VOICE_DIR, 'dictate']);
+
+// Languages offered for the multilingual Whisper models, as Whisper codes;
+// '' detects the language each time
+const VOICE_LANGUAGES = [
+    ['', 'Detect automatically'], ['ar', 'Arabic'], ['bg', 'Bulgarian'],
+    ['ca', 'Catalan'], ['zh', 'Chinese'], ['hr', 'Croatian'], ['cs', 'Czech'],
+    ['da', 'Danish'], ['nl', 'Dutch'], ['en', 'English'], ['fi', 'Finnish'],
+    ['fr', 'French'], ['de', 'German'], ['el', 'Greek'], ['he', 'Hebrew'],
+    ['hi', 'Hindi'], ['hu', 'Hungarian'], ['id', 'Indonesian'], ['it', 'Italian'],
+    ['ja', 'Japanese'], ['ko', 'Korean'], ['no', 'Norwegian'], ['pl', 'Polish'],
+    ['pt', 'Portuguese'], ['ro', 'Romanian'], ['ru', 'Russian'], ['sk', 'Slovak'],
+    ['sl', 'Slovenian'], ['es', 'Spanish'], ['sv', 'Swedish'], ['th', 'Thai'],
+    ['tr', 'Turkish'], ['uk', 'Ukrainian'], ['vi', 'Vietnamese'],
+];
+
+// Non-empty, like the helper's own check
+const voiceModelPresent = model => voiceFileSize(model.file) > 0;
 
 export default class TabletKeyboardPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
@@ -75,19 +92,58 @@ export default class TabletKeyboardPreferences extends ExtensionPreferences {
         switchRow(typing, 'autocorrect', 'Small autocorrections',
             'i → I, dont → don’t, teh → the. Backspace right after a fix undoes it');
 
-        if (GLib.file_test(VOICE_HELPER, GLib.FileTest.IS_EXECUTABLE)) {
+        const models = readModels();
+        if (GLib.file_test(VOICE_HELPER, GLib.FileTest.IS_EXECUTABLE) && models.length) {
             const voice = new Adw.PreferencesGroup({title: 'Voice typing'});
             page.add(voice);
+            // Shows the model in use: the picked one, else the first
+            // downloaded, like the keyboard
+            const picked = settings.get_string('voice-engine');
+            let selected = models.findIndex(m => m.id === picked);
+            if (selected < 0)
+                selected = models.findIndex(voiceModelPresent);
+            // A combo row can't show nothing selected (it falls back to the
+            // first item, which then can't be picked), so a placeholder
+            // stands in until a model is picked
+            const choices = selected < 0 ? [null, ...models] : models;
             const engine = new Adw.ComboRow({
-                title: 'Engine',
-                subtitle: 'Whisper: English, 142 MB. Parakeet: 25 European languages, ' +
-                    'detected automatically, 416 MB, downloads when first picked',
-                model: Gtk.StringList.new(['Whisper', 'Parakeet']),
-                selected: Math.max(0, ENGINES.indexOf(settings.get_string('voice-engine'))),
+                title: 'Speech model',
+                model: Gtk.StringList.new(choices.map(m => m ? `${m.name} · ${m.size}` : 'None')),
+                selected: Math.max(0, selected),
             });
-            engine.connect('notify::selected',
-                () => settings.set_string('voice-engine', ENGINES[engine.selected]));
+            const describe = () => {
+                const model = choices[engine.selected];
+                if (!model)
+                    engine.subtitle = 'None downloaded yet. Pick one to download it';
+                else if (voiceModelPresent(model))
+                    engine.subtitle = model.description;
+                else
+                    engine.subtitle = `${model.description} Not downloaded: picking it downloads it (${model.size})`;
+            };
+            describe();
+            engine.connect('notify::selected', () => {
+                const model = choices[engine.selected];
+                if (model)
+                    settings.set_string('voice-engine', model.id);
+                describe();
+            });
             voice.add(engine);
+
+            const languages = Gtk.StringList.new(VOICE_LANGUAGES.map(([, name]) => name));
+            const language = new Adw.ComboRow({
+                title: 'Language',
+                subtitle: 'For the multilingual Whisper models. Picking yours is more ' +
+                    'accurate than detecting it, especially for short phrases',
+                model: languages,
+                selected: Math.max(0, VOICE_LANGUAGES.findIndex(
+                    ([code]) => code === settings.get_string('voice-language'))),
+            });
+            language.connect('notify::selected', () =>
+                settings.set_string('voice-language', VOICE_LANGUAGES[language.selected][0]));
+            voice.add(language);
+
+            switchRow(voice, 'voice-battery-saver', 'Battery saver',
+                'Transcribe on the power-efficient processor cores. About twice as slow');
 
             page.add(this._dictionaryGroup(settings));
         }

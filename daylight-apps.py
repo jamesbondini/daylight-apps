@@ -12,9 +12,10 @@ scripts):
   enabled    optional: exit 0 if turned on; with `enable` and `disable`
              this adds an on/off switch (e.g. for GNOME Shell extensions)
   extras     optional: list optional parts (e.g. models), one per line as
-             ID|Title|Subtitle|yes-or-no (downloaded); `extra-add ID` and
-             `extra-remove ID` download and delete one. Group title comes
-             from EXTRAS_TITLE in info.
+             ID|Title|Subtitle|yes-or-no (downloaded), plus optionally one
+             line without `|` shown under the group title (e.g. the space
+             they use); `extra-add ID` and `extra-remove ID` download and
+             delete one. Group title comes from EXTRAS_TITLE in info.
   page.py    optional: Python module whose build(window) returns a widget
              (or None) shown on the app's page while it is installed, for
              settings such as Hardware Buttons'.
@@ -72,6 +73,7 @@ class AppEntry:
         self.status = ""
         self.enabled = None  # None = unknown or not switchable
         self.extras = []  # (id, title, subtitle, present)
+        self.extras_note = ""
         self.toggling = False
         self.checking = False  # an `installed` check is running
 
@@ -148,7 +150,7 @@ def check_installed(app, callback):
     try:
         proc = launcher.spawnv([str(app.path / "installed")])
     except GLib.Error:  # missing or not executable
-        app.installed, app.status, app.enabled, app.extras = False, "", None, []
+        app.installed, app.status, app.enabled, app.extras, app.extras_note = False, "", None, [], ""
         callback(app)
         return
     app.checking = True
@@ -164,7 +166,7 @@ def check_installed(app, callback):
             app.installed, app.status = False, ""
         app.enabled = None
         if not app.installed:
-            app.extras = []
+            app.extras, app.extras_note = [], ""
         after_extras = lambda: (check_enabled(app, callback) if app.installed and app.switchable
                                 else callback(app))
         if app.installed and app.script("extras"):
@@ -182,7 +184,7 @@ def check_extras(app, callback):
     try:
         proc = launcher.spawnv([str(app.path / "extras")])
     except GLib.Error:  # removed or made non-executable since the check
-        app.extras = []
+        app.extras, app.extras_note = [], ""
         callback()
         return
 
@@ -192,11 +194,13 @@ def check_extras(app, callback):
             out = text(out)
         except GLib.Error:
             out = ""
-        app.extras = []
+        app.extras, app.extras_note = [], ""
         for line in out.splitlines():
             parts = line.split("|")
             if len(parts) == 4:
                 app.extras.append((parts[0], parts[1], parts[2], parts[3].strip() == "yes"))
+            elif len(parts) == 1 and line.strip():
+                app.extras_note = line.strip()
         callback()
 
     proc.communicate_async(None, None, done)
@@ -411,6 +415,7 @@ class AppPage(Adw.NavigationPage):
             self.extras_group.remove(row)
         self.extra_rows = []
         self.extras_group.set_visible(bool(app.installed) and bool(app.extras))
+        self.extras_group.set_description(app.extras_note or None)
         if not app.installed:
             return
         for ident, title, subtitle, present in app.extras:

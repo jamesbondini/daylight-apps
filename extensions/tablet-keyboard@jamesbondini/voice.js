@@ -10,14 +10,18 @@ import GLib from 'gi://GLib';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-const DIR = GLib.build_filenamev([GLib.get_user_data_dir(), 'daylight-apps', 'voice-typing']);
-const HELPER = GLib.build_filenamev([DIR, 'dictate']);
+import {VOICE_DIR, readModels, voiceFileSize} from './voicemodels.js';
 
-// Keep in sync with model_file in apps/voice-typing/dictate
-const MODELS = {
-    whisper: {name: 'Whisper', file: 'ggml-base.en.bin', size: '142 MB'},
-    parakeet: {name: 'Parakeet', file: 'ggml-parakeet-tdt-0.6b-v3-q4_k.bin', size: '416 MB'},
-};
+const HELPER = GLib.build_filenamev([VOICE_DIR, 'dictate']);
+
+// The speech models, read from the models file installed next to the helper
+// (apps/voice-typing/models): id -> {name, description, bytes, size, file},
+// in the file's order
+let MODELS = new Map();
+
+function loadModels() {
+    MODELS = new Map(readModels().map(m => [m.id, m]));
+}
 
 // The helper records 16 kHz mono 16-bit WAV to
 // $XDG_RUNTIME_DIR/dictate-<its pid>/speech.wav
@@ -30,14 +34,19 @@ const LEVEL_CEIL_DB = -15;
 const ERROR_MS = 2000;
 
 function modelPresent(engine) {
+    const model = MODELS.get(engine);
     // Non-empty, like the helper's own check
-    const path = GLib.build_filenamev([DIR, MODELS[engine].file]);
-    try {
-        return Gio.File.new_for_path(path).query_info('standard::size',
-            Gio.FileQueryInfoFlags.NONE, null).get_size() > 0;
-    } catch {
-        return false;
-    }
+    return model ? voiceFileSize(model.file) > 0 : false;
+}
+
+// How far a model's download is, 0 to 1, from the size of the partial file
+// the helper writes; null when it can't be told
+function downloadProgress(engine) {
+    const {file, bytes} = MODELS.get(engine) ?? {};
+    if (!file || !bytes)
+        return null;
+    const size = voiceFileSize(`${file}.part`);
+    return size < 0 ? null : Math.clamp(size / bytes, 0, 1);
 }
 
 // Model downloads outlive the keyboard, which the shell rebuilds when touch
@@ -55,7 +64,7 @@ function download(engine) {
     if (downloads.has(engine))
         return;
 
-    const {name, size} = MODELS[engine];
+    const {name, size} = MODELS.get(engine);
     let proc;
     try {
         proc = Gio.Subprocess.new([HELPER, '--download', engine],
@@ -80,10 +89,14 @@ function download(engine) {
 
 export class Dictation {
     // onChanged(): availability or state changed; onText(text): a transcription;
-    // words(): the dictionary entries, read at the start of each recording
-    constructor({engine, words, onChanged, onText}) {
-        this._engine = engine;
+    // words(): the dictionary entries and options(): the helper's options
+    // (like --language), both read at the start of each recording
+    // engine: the model picked in the settings; '' or an unknown one means
+    // the first downloaded
+    constructor({engine, words, options, onChanged, onText}) {
+        this._picked = engine;
         this._words = words;
+        this._options = options;
         this._onChanged = onChanged;
         this._onText = onText;
         this._proc = null;
@@ -109,11 +122,21 @@ export class Dictation {
     }
 
     _probe() {
-        return GLib.file_test(HELPER, GLib.FileTest.IS_EXECUTABLE);
+        loadModels();
+        return GLib.file_test(HELPER, GLib.FileTest.IS_EXECUTABLE) &&
+            MODELS.size > 0;
+    }
+
+    // The model in use, like the helper's --resolve; null when none is
+    // picked or downloaded
+    get _engine() {
+        if (MODELS.has(this._picked))
+            return this._picked;
+        return [...MODELS.keys()].find(modelPresent) ?? null;
     }
 
     get engineName() {
-        return MODELS[this._engine].name;
+        return MODELS.get(this._engine)?.name ?? null;
     }
 
     // 'idle' | 'downloading' | 'recording' | 'transcribing' | 'error'
@@ -143,13 +166,17 @@ export class Dictation {
         }
     }
 
-    // Switching to an engine without its model fetches it straight away
+    // Picking a model that isn't downloaded fetches it straight away
     setEngine(engine) {
-        if (!(engine in MODELS) || engine === this._engine)
+        if (engine === this._picked)
             return;
-        this.cancel();
-        this._engine = engine;
-        if (this.available && !modelPresent(engine))
+        // Picking the model already in use (as the app does after a
+        // download) must not cut off a recording
+        const before = this._engine;
+        this._picked = engine;
+        if (this._engine !== before)
+            this.cancel();
+        if (this.available && MODELS.has(engine) && !modelPresent(engine))
             download(engine);
         this._onChanged();
     }
@@ -160,6 +187,12 @@ export class Dictation {
             return;
         this._clearError();
 
+        // Nothing is downloaded without the user picking it
+        if (!this._engine) {
+            Main.notify('Voice typing', 'Pick a speech model first, under Speech Models in ' +
+                'Daylight Apps (Voice Typing), or under Voice typing in the keyboard settings.');
+            return;
+        }
         if (!modelPresent(this._engine)) {
             download(this._engine);
             return;
@@ -167,7 +200,7 @@ export class Dictation {
 
         let proc;
         try {
-            proc = Gio.Subprocess.new([HELPER, this._engine, ...this._words()],
+            proc = Gio.Subprocess.new([HELPER, ...this._options(), this._engine, ...this._words()],
                 Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE |
                 Gio.SubprocessFlags.STDERR_SILENCE);
         } catch (e) {
@@ -242,6 +275,11 @@ export class Dictation {
         } catch {
             return null;
         }
+    }
+
+    // How far the model's download is, 0 to 1; null when not downloading
+    downloadProgress() {
+        return this.state === 'downloading' ? downloadProgress(this._engine) : null;
     }
 
     // Stop recording and transcribe what was said

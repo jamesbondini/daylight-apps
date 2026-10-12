@@ -1,13 +1,16 @@
 #!/bin/bash
-# Try voice typing in a terminal, with the engine picked in the keyboard settings.
+# Try voice typing in a terminal, with the model picked in the keyboard settings.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 require_terminal "$0"
 
 DICTATE="${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing/dictate"
 engine=$(voice_engine)
+[ -n "$engine" ] || fail "Download a speech model first, under Speech Models in Daylight Apps."
 "$DICTATE" --download "$engine" || fail "Download failed"
-echo "Engine: ${engine^}. Say something, then press Enter."
+title=$("$DICTATE" --title "$engine")
+echo "Model: $title. Say something, then press Enter."
 mapfile -t words < <(voice_words)
-text=$("$DICTATE" "$engine" "${words[@]}") || fail "Voice typing failed"
+mapfile -t options < <(voice_options)
+text=$("$DICTATE" "${options[@]}" "$engine" "${words[@]}") || fail "Voice typing failed"
 echo
 echo "Heard: ${text:-(nothing)}"

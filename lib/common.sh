@@ -142,11 +142,37 @@ gnome_ext_enabled() {
   esac
 }
 
-# Voice typing engine picked in the Tablet Keyboard settings (whisper or parakeet)
+# Speech model voice typing uses: the one picked in the Tablet Keyboard
+# settings, else the first downloaded (see apps/voice-typing/models). Prints
+# nothing when there is none.
 voice_engine() {
   local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@jamesbondini/schemas"
-  gsettings --schemadir "$schemas" get org.gnome.shell.extensions.tablet-keyboard voice-engine \
-    2>/dev/null | tr -d "'" | grep -x 'whisper\|parakeet' || echo whisper
+  local picked
+  picked=$(gsettings --schemadir "$schemas" get org.gnome.shell.extensions.tablet-keyboard voice-engine \
+    2>/dev/null | tr -d "'") || true
+  "${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing/dictate" --resolve "$picked" 2>/dev/null || true
+}
+
+# Pick the speech model voice typing uses, or with no argument go back to the
+# first downloaded one. Older keyboard schemas only know whisper and parakeet.
+voice_set_engine() {
+  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@jamesbondini/schemas"
+  if [ -n "${1:-}" ]; then
+    gsettings --schemadir "$schemas" set org.gnome.shell.extensions.tablet-keyboard voice-engine "$1"
+  else
+    gsettings --schemadir "$schemas" reset org.gnome.shell.extensions.tablet-keyboard voice-engine
+  fi 2>/dev/null
+}
+
+# The dictate options for the keyboard's Language and Battery saver settings,
+# one per line
+voice_options() {
+  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@jamesbondini/schemas"
+  local key=org.gnome.shell.extensions.tablet-keyboard language saver
+  language=$(gsettings --schemadir "$schemas" get $key voice-language 2>/dev/null | tr -d "'") || true
+  saver=$(gsettings --schemadir "$schemas" get $key voice-battery-saver 2>/dev/null) || true
+  if [ -n "$language" ]; then printf '%s\n' --language "$language"; fi
+  if [ "$saver" = true ]; then echo --battery-saver; fi
 }
 
 # The voice dictionary from the keyboard settings, one entry per line

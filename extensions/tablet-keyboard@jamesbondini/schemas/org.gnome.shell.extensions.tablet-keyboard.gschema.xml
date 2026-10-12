@@ -57,12 +57,16 @@
       <summary>Key colors: mono is high contrast black and white, for monochrome screens, and inverts with the system dark style; mono-light is always black on white and mono-dark always white on black</summary>
     </key>
     <key name="voice-engine" type="s">
-      <choices>
-        <choice value="whisper"/>
-        <choice value="parakeet"/>
-      </choices>
-      <default>'whisper'</default>
-      <summary>Speech recognition engine for the microphone key</summary>
+      <default>''</default>
+      <summary>Speech model for the microphone key: an ID from the Voice Typing app's models file, or empty for the first downloaded one</summary>
+    </key>
+    <key name="voice-language" type="s">
+      <default>''</default>
+      <summary>Language for the multilingual Whisper models: a Whisper language code, or empty to detect it</summary>
+    </key>
+    <key name="voice-battery-saver" type="b">
+      <default>false</default>
+      <summary>Transcribe on the power-efficient CPU cores only (about twice as slow)</summary>
     </key>
     <key name="voice-words" type="as">
       <default>[]</default>
