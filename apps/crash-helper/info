@@ -1,7 +1,8 @@
 NAME=Crash Helper
 SUMMARY=Notifies you when an app crashes. Tap the notification to have Claude Code read the core dump and logs and explain what happened.
 ICON=dialog-warning-symbolic
-WEBSITE=https://github.com/basecamp/omarchy
+WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/apps/crash-helper
+BASED_ON=https://github.com/basecamp/omarchy
 SETUP_LABEL=Diagnose Last Crash
 NEEDS=claude-code
 CATEGORY=developer

@@ -3,7 +3,7 @@
 
 Each app directory holds (in the spirit of Omarchy's install/installed/remove
 scripts):
-  info       KEY=value metadata (NAME, SUMMARY, ICON, CATEGORY, WEBSITE,
+  info       KEY=value metadata (NAME, SUMMARY, ICON, CATEGORY, WEBSITE, BASED_ON,
              SETUP_LABEL, OPEN, OPEN_LABEL)
   install    install or update the app
   installed  exit 0 if installed, printing a one-line status
@@ -243,6 +243,16 @@ class AppPage(Adw.NavigationPage):
             link = Gtk.LinkButton(uri=site, label=site.split("://", 1)[-1], halign=Gtk.Align.START)
             link.add_css_class("flat")
             box.append(link)
+        # Credit for apps we wrote ourselves, modelled on someone else's project
+        if based_on := app.meta.get("BASED_ON"):
+            credit = Gtk.Box(spacing=0, halign=Gtk.Align.START)
+            label = Gtk.Label(label="Based on")
+            label.add_css_class("dim-label")
+            credit.append(label)
+            link = Gtk.LinkButton(uri=based_on, label=based_on.split("://", 1)[-1])
+            link.add_css_class("flat")
+            credit.append(link)
+            box.append(credit)
 
         # Shown while an app from NEEDS is missing
         self.needs_banner = Adw.Banner(button_label="Show")

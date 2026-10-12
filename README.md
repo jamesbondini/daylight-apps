@@ -120,7 +120,7 @@ Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
 
 - `info`: `NAME=`, `SUMMARY=`, `ICON=` (space-separated icon names, first found wins),
   `CATEGORY=` (`apps`, `developer`, `services` or `extensions`; defaults to `apps`),
-  optional `WEBSITE=`, `SETUP_LABEL=`, `OPEN=` (desktop id or URL), `OPEN_LABEL=`
+  optional `WEBSITE=`, `BASED_ON=` (shown as "Based on …" for our own code modelled on another project), `SETUP_LABEL=`, `OPEN=` (desktop id or URL), `OPEN_LABEL=`
 - `install`: installs or updates (also used for **Update**)
 - `installed`: exit 0 when installed; first line of stdout is shown as status
 - `remove`: uninstalls
