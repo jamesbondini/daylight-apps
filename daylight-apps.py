@@ -35,7 +35,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gio, GLib, Gtk, Pango  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
 APP_ID = "io.github.jamesbondini.DaylightApps"
 ROOT = Path(__file__).resolve().parent
@@ -705,6 +705,12 @@ class Window(Adw.ApplicationWindow):
 class Application(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+
+    def do_startup(self):
+        Adw.Application.do_startup(self)
+        # Window icon from the repo, so it shows even before install.sh has run
+        Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).add_search_path(str(ROOT / "data"))
+        Gtk.Window.set_default_icon_name(APP_ID)
 
     def do_activate(self):
         win = self.props.active_window or Window(self)
