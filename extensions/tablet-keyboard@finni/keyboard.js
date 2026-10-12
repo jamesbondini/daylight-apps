@@ -23,9 +23,12 @@ import {Dictation} from './voice.js';
 const LONG_PRESS_MS = 450;
 const TRACKPAD_PRESS_MS = 400;
 const DELETE_REPEAT_MS = 450;
-const DELETE_CHAR_MS = 90;
+// Held backspace starts at DELETE_CHAR_SLOW_MS per letter and speeds up to
+// DELETE_CHAR_MS, then switches to whole words
+const DELETE_CHAR_SLOW_MS = 180;
+const DELETE_CHAR_MS = 70;
 const DELETE_WORD_MS = 280;
-const DELETE_WORDS_AFTER = 12;
+const DELETE_WORDS_AFTER = 10;
 const SHIFT_DOUBLE_TAP_MS = 350;
 const DOUBLE_SPACE_MS = 1200;
 const TYPING_QUIET_MS = 400;
@@ -1454,7 +1457,7 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
 
     // Holding backspace deletes letters, then speeds up to whole words
     _repeatDelete(touch) {
-        const words = touch.deleted >= DELETE_WORDS_AFTER && !touch.alien && !this._isTerminal();
+        const words = touch.deleted >= DELETE_WORDS_AFTER && !touch.alien;
         if (words) {
             this._deleteWord();
         } else {
@@ -1462,8 +1465,10 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             touch.deleted++;
         }
 
+        const speedup = Math.min(touch.deleted / DELETE_WORDS_AFTER, 1);
+        const charMs = DELETE_CHAR_SLOW_MS - (DELETE_CHAR_SLOW_MS - DELETE_CHAR_MS) * speedup;
         touch.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
-            words ? DELETE_WORD_MS : DELETE_CHAR_MS, () => {
+            words ? DELETE_WORD_MS : Math.round(charMs), () => {
                 this._repeatDelete(touch);
                 return GLib.SOURCE_REMOVE;
             });
@@ -1488,7 +1493,10 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
     _deleteWord() {
         const word = this._history.match(/\S*\s*$/u)[0];
         const length = [...word].length;
-        if (length > 0 && !this._selection && this._usesInputMethod(false) &&
+        if (this._isTerminal())
+            // Terminals don't map Ctrl+Backspace; Ctrl+W is the shell's word rubout
+            this._sendCombo([Clutter.KEY_Control_L], Clutter.KEY_w);
+        else if (length > 0 && !this._selection && this._usesInputMethod(false) &&
             this._splitDelete(length).ok)
             this._deleteBack(length);
         else
