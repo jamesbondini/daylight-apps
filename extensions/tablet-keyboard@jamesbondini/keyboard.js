@@ -919,6 +919,10 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
             };
             window.connectObject('unmanaged', () => this._movedWindows.delete(window), this);
             this._movedWindows.set(window, entry);
+        } else if (window.maximized_vertically) {
+            // Maximized since we made room (by the user, or an app opening):
+            // keep it maximized rather than reverting to the old size
+            entry.maximized = true;
         }
 
         const frame = window.get_frame_rect();
@@ -1773,10 +1777,11 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         if (!key)
             return;
 
-        // Rolling typing: a new key press commits pending taps first
+        // Rolling typing: a new key press commits pending taps first, so a
+        // space still held when the next letter comes down stays in front
         if (key.spec.kind === 'char' || key.spec.kind === 'space') {
             for (const other of this._touches.values()) {
-                if (other.mode === 'press' && other.key?.spec.kind === 'char') {
+                if (other.mode === 'press' && ['char', 'space'].includes(other.key?.spec.kind)) {
                     this._clearTimer(other);
                     // Stay on this page: the new key is on it, and switching
                     // would destroy it

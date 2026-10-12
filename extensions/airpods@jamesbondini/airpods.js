@@ -255,17 +255,19 @@ export class AirPodsManager {
     }
 
     destroy() {
+        // Sent before cancelling: GDBus drops calls whose cancellable is
+        // already cancelled without sending them
+        if (this._registered) {
+            this._registered = false;
+            this._callManager('UnregisterProfile', new GLib.Variant('(o)', [PROFILE_PATH]))
+                .catch(() => {});
+        }
         this._cancellable.cancel();
         for (const id of this._timers.values())
             GLib.source_remove(id);
         this._timers.clear();
         this._objects?.disconnectObject(this);
         this._link?.close();
-        if (this._registered) {
-            this._registered = false;
-            this._callManager('UnregisterProfile', new GLib.Variant('(o)', [PROFILE_PATH]))
-                .catch(() => {});
-        }
         this._profile.unexport();
     }
 

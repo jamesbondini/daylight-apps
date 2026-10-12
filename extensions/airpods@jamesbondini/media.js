@@ -32,6 +32,7 @@ export class MediaControl {
     constructor() {
         this._mixer = Volume.getMixerControl();
         this._paused = new Set();
+        this._pausing = Promise.resolve();
         this._duck = null;
         this._inEar = null;
     }
@@ -46,9 +47,10 @@ export class MediaControl {
         const out = when === 'one' ? inEar < before : inEar === 0;
         const back = when === 'one' ? inEar > before : before === 0;
         if (out && this._isOutput(address))
-            this._pause().catch(e => logError(e, 'AirPods: pausing media'));
-        else if (back && this._paused.size)
-            this._resume();
+            this._pausing = this._pause().catch(e => logError(e, 'AirPods: pausing media'));
+        // A pause still in flight finishes first, so its players resume too
+        else if (back)
+            this._pausing.then(() => this._resume());
     }
 
     speechChanged(address, talking) {
@@ -80,8 +82,9 @@ export class MediaControl {
             return;
         const {sink, volume} = this._duck;
         this._duck = null;
-        // Leave the volume alone if the output changed meanwhile
-        if (this._mixer.get_default_sink() === sink) {
+        // The AirPods' own volume, even if another output became the default
+        // meanwhile; nothing to restore once they are gone
+        if (this._mixer.lookup_stream_id(sink.id) === sink) {
             sink.volume = volume;
             sink.push_volume();
         }

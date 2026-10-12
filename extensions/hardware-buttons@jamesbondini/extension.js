@@ -165,8 +165,11 @@ export default class HardwareButtonsExtension extends Extension {
         const {button} = this._pending;
         this._end();
         this._settings.set_string('last-press', `${button} ${kind} ${GLib.get_real_time()}`);
-        // After the grab is gone, so the action can take its own
-        runAction(this._settings.get_string(`${button}-${kind}`));
+        // After the grab is gone, so the action can take its own. A hold
+        // with no action of its own is a slow press.
+        const action = this._settings.get_string(`${button}-${kind}`) ||
+            (kind === 'hold' ? this._settings.get_string(`${button}-press`) : '');
+        runAction(action);
     }
 
     _end() {
