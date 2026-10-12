@@ -5,6 +5,12 @@ modelled on Omarchy's `omarchy-install-*` / `omarchy-installed-*` / `omarchy-rem
 
 **[Latest release](https://github.com/jamesbondini/daylight-apps/releases/latest)**: what's included and how to install.
 
+<p align="center">
+  <img src="docs/tablet-keyboard.jpg" width="420" alt="Daylight DC-1 showing daylightcomputer.com in the browser with the Tablet Keyboard open">
+  <br>
+  <em>The Tablet Keyboard extension on a Daylight DC-1</em>
+</p>
+
 ## Getting started
 
 Run this in a terminal:
