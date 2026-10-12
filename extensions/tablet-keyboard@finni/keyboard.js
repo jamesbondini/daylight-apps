@@ -722,6 +722,9 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         // Monochrome inverts to white on black with the system dark style
         else if (scheme === 'mono' && systemDark)
             scheme = 'mono-dark';
+        // Monochrome light stays black on white
+        else if (scheme === 'mono-light')
+            scheme = 'mono';
         // Style class for the keyboard and its popups, null for light
         this._theme = scheme === 'light' ? null : `tk-${scheme}`;
         for (const name of THEME_CLASSES)
