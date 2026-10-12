@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="data/io.github.jamesbondini.DaylightApps.svg" width="128" alt="Daylight Apps icon: a sun rising over a row of apps">
+</p>
+
 # Daylight Apps
 
 A small GTK/libadwaita installer for the Daylight DC-1 (Nura / postmarketOS, aarch64, musl),
