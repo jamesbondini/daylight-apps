@@ -3,3 +3,6 @@ SUMMARY=Lets terminal apps such as Claude Code and Neovim copy and paste (wl-cop
 ICON=edit-paste-symbolic
 WEBSITE=https://github.com/bugaevc/wl-clipboard
 CATEGORY=setup
+RECOMMENDED=yes
+# Keep in sync with the packages ./install adds
+PACKAGES=wl-clipboard

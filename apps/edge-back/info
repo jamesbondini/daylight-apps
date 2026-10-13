@@ -3,3 +3,4 @@ SUMMARY=Swipe in from the left edge of the screen to go back in browsers, Files,
 ICON=go-previous-symbolic
 WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/extensions/edge-back@jamesbondini
 CATEGORY=extensions
+RECOMMENDED=yes

@@ -3,3 +3,4 @@ SUMMARY=Scroll terminals such as Ghostty and Console by dragging two fingers, li
 ICON=input-touchpad-symbolic
 WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/extensions/two-finger-scroll@jamesbondini
 CATEGORY=extensions
+RECOMMENDED=yes

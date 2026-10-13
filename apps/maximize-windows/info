@@ -4,3 +4,4 @@ ICON=view-fullscreen-symbolic
 WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/extensions/maximize-new-windows@jamesbondini
 BASED_ON=https://github.com/denysvitali/dc-1-pmos/issues/10
 CATEGORY=extensions
+RECOMMENDED=yes

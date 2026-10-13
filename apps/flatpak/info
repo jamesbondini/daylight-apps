@@ -3,3 +3,6 @@ SUMMARY=Installs desktop apps from Flathub. Install this first: the apps marked 
 ICON=flatpak system-software-install-symbolic
 WEBSITE=https://flathub.org
 CATEGORY=setup
+RECOMMENDED=yes
+# Keep in sync with the packages ensure_flatpak (lib/common.sh) adds
+PACKAGES=flatpak

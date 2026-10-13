@@ -55,6 +55,13 @@ How the GUI runs scripts, which shapes how scripts should be written:
 - `page.py` is imported in-process; `build(window)` returns a widget. Exceptions are caught and
   printed so a broken page cannot crash the app.
 
+**`lib/update-all`** (the Update All button) and **`lib/install-apps`** (the Recommended Apps
+row, for apps with `RECOMMENDED=yes`) run across apps; the GUI shows them on a `TaskPage`, which
+shares the script runner (`ScriptPage`) with `AppPage`. Update All upgrades apk packages in one
+`as_root` call and then re-runs every installed app's `install`, so `install` scripts must only
+call `as_root` when something is actually missing (Tailscale checks this first).
+`install-apps` installs the `PACKAGES=` of all the apps together first, for one password prompt.
+
 **`lib/common.sh`** is sourced by every script with the readlink-resolved header (scripts may be
 reached via symlinks):
 
@@ -79,6 +86,8 @@ It sets `set -euo pipefail` and provides `step`/`info`/`fail` (the `==>` / inden
 
 Paired lists that must be kept in sync by hand (each side has a comment pointing at the other):
 - `ACTIONS` in `apps/hardware-buttons/page.py` ↔ `extensions/hardware-buttons@jamesbondini/extension.js`
+- `PACKAGES=` in an app's `info` ↔ the apk packages its `install` adds (`apps/clipboard-tools/`,
+  `apps/flatpak/` ↔ `ensure_flatpak`); a missing one means a second password prompt in Recommended Apps
 
 **IDs**: extension UUIDs use `@jamesbondini`, app/desktop ids `io.github.jamesbondini.*`.
 `lib/migrate-ids.sh` (run by `install.sh`) moves old `@finni` / `dev.finni.*` installs over; keep it

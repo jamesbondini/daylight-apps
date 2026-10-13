@@ -3,3 +3,4 @@ SUMMARY=Swipe four fingers left or right to switch to the next or previous windo
 ICON=focus-windows-symbolic input-touchpad-symbolic
 WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/extensions/window-gestures@jamesbondini
 CATEGORY=extensions
+RECOMMENDED=yes

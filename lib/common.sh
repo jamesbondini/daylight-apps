@@ -42,6 +42,7 @@ flatpak_present() { flatpak info "$1" >/dev/null 2>&1; }
 # Install Flatpak itself (asks for your password) and add the Flathub remote
 # for the user, if missing. Apps it installs show up in the app grid only after
 # logging out and in once, since that adds Flatpak's folders to XDG_DATA_DIRS.
+# Keep its packages in sync with PACKAGES= in apps/flatpak/info.
 ensure_flatpak() {
   if ! cmd_present flatpak; then
     step "Installing Flatpak (asks for your password)"
@@ -264,4 +265,50 @@ if schema and schema.has_key("voice-words"):
     for w in Gio.Settings.new_full(schema, None, None).get_strv("voice-words"):
         print(w)
 ' "$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@jamesbondini/schemas" 2>/dev/null
+}
+
+# App recipe directories, one per line, sorted by id. Ones in
+# ~/.config/daylight-apps/apps override built-ins with the same id, as in the GUI.
+app_dirs() {
+  local repo user dir id
+  repo="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../apps"
+  user="${XDG_CONFIG_HOME:-$HOME/.config}/daylight-apps/apps"
+  local -A dirs=()
+  for dir in "$repo"/*/ "$user"/*/; do
+    [ -f "$dir/info" ] && [ -f "$dir/install" ] || continue
+    # The id is the entry's own name, as in the GUI, even if it is a symlink
+    id=$(basename "$dir")
+    dirs[$id]=$(readlink -f "$dir")
+  done
+  for id in "${!dirs[@]}"; do echo "$id"; done | sort | while read -r id; do echo "${dirs[$id]}"; done
+}
+
+# A value from an app's info file, e.g. app_info "$dir" NAME
+app_info() { sed -n "s/^$2=//p" "$1/info" | head -n 1; }
+
+# Run one of an app's scripts, from its directory as the GUI does
+app_run() { (cd "$1" && "./$2"); }
+
+# Exit 0 if the app in this directory is installed
+app_installed() { [ -x "$1/installed" ] && app_run "$1" installed >/dev/null 2>&1; }
+
+# Names joined as "a, b, c"
+join_names() { local IFS=,; echo "$*" | sed 's/,/, /g'; }
+
+# Run the install script of each app directory under a "VERB <name>" step.
+# Adds the names of those that fail to the caller's failed array, and sets
+# extensions=1 if an extension was installed (it needs a logout to load).
+app_install_each() {
+  local verb=$1 dir name
+  shift
+  for dir in "$@"; do
+    name=$(app_info "$dir" NAME)
+    name=${name:-$(basename "$dir")}
+    step "$verb $name"
+    if ! app_run "$dir" install; then
+      failed+=("$name")
+    elif [ "$(app_info "$dir" CATEGORY)" = extensions ]; then
+      extensions=1
+    fi
+  done
 }

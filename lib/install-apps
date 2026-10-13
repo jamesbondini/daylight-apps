@@ -1,0 +1,41 @@
+#!/bin/bash
+# Install the apps in the given directories, in order (the GUI uses this for
+# the recommended apps). The apk packages they list in PACKAGES= are
+# installed together first, so there is one password prompt for all of them.
+source "$(dirname "$(readlink -f "$0")")/common.sh"
+
+[ $# -gt 0 ] || fail "Usage: $0 APP_DIR..."
+
+dirs=()
+for dir in "$@"; do
+  [ -f "$dir/info" ] || fail "$dir is not an app directory"
+  app_installed "$dir" || dirs+=("$(readlink -f "$dir")")
+done
+if [ ${#dirs[@]} -eq 0 ]; then
+  step "Done"
+  info "These apps are installed already."
+  exit 0
+fi
+
+missing=()
+for dir in "${dirs[@]}"; do
+  for pkg in $(app_info "$dir" PACKAGES); do
+    apk_present "$pkg" || missing+=("$pkg")
+  done
+done
+if [ ${#missing[@]} -gt 0 ]; then
+  step "Installing ${missing[*]} (asks for your password)"
+  # Carry on if this fails: the apps that need no packages can still be
+  # installed, and the others try again (and say why) in their own install
+  as_root "$(apk_add_cmd "${missing[@]}")" || info "Carrying on with each app."
+fi
+
+failed=() extensions=
+app_install_each Installing "${dirs[@]}"
+
+step "Done"
+[ -n "$extensions" ] && info "Log out and back in to turn on the new extensions."
+if [ ${#failed[@]} -gt 0 ]; then
+  fail "Could not install: $(join_names "${failed[@]}"). See above for why."
+fi
+info "All installed."

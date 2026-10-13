@@ -57,6 +57,18 @@ cd ~/Projects/daylight-apps && git pull
 
 The app shows these in the same groups, set by `CATEGORY=` in each app's `info`.
 
+**Recommended Apps**: until they are all installed, a row at the top installs the apps marked
+`RECOMMENDED=yes` in one go (`lib/install-apps`): Flatpak, Clipboard Tools, Tablet Keyboard,
+Maximize New Windows, Two-Finger Scroll, Window Gestures, Edge Swipe Back and Hardware Buttons.
+The apk packages they list in `PACKAGES=` are installed together first, so it asks for your
+password once.
+
+**Update All** (the button at the top right) runs `lib/update-all`: it pulls Daylight Apps itself
+(skipped if the checkout has local changes), upgrades the system packages and any Flatpaks
+installed for all users with one password prompt, updates your Flatpak apps, and then runs the
+`install` script of every installed app again. Those normally only need root to add missing
+packages, so they don't ask again. It also works from a terminal: `lib/update-all`.
+
 ### Start Here
 
 | App     | Installed via                                                     | Setup step |
@@ -127,8 +139,12 @@ Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
 
 - `info`: `NAME=`, `SUMMARY=`, `ICON=` (space-separated icon names, first found wins),
   `CATEGORY=` (`setup` for Start Here, `apps`, `developer`, `services` or `extensions`; defaults to `apps`),
-  optional `WEBSITE=`, `BASED_ON=` (shown as "Based on …" for our own code modelled on another project), `SETUP_LABEL=`, `OPEN=` (desktop id or URL), `OPEN_LABEL=`
-- `install`: installs or updates (also used for **Update**)
+  optional `WEBSITE=`, `BASED_ON=` (shown as "Based on …" for our own code modelled on another project), `SETUP_LABEL=`, `OPEN=` (desktop id or URL), `OPEN_LABEL=`,
+  `NEEDS=` (app ids to install first), `RECOMMENDED=yes` (part of Recommended Apps) and
+  `PACKAGES=` (apk packages `install` would ask for your password to add; Recommended Apps installs them all together first)
+- `install`: installs or updates (also used for **Update**, and by **Update All** for every
+  installed app). Only ask for root when something is missing, so that Update All, which has
+  already upgraded the system packages, doesn't ask again
 - `installed`: exit 0 when installed; first line of stdout is shown as status
 - `remove`: uninstalls
 - `setup` (optional): post-install step. Call `require_terminal "$0"` if it needs keyboard input.
@@ -140,7 +156,8 @@ Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
 
 Scripts source `lib/common.sh` for `step`, `info`, `fail`, `as_root` (one polkit prompt per
 call), `apk_present`, `apk_add_cmd`/`apk_del_cmd`, `flatpak_install_app`/`flatpak_status`/
-`flatpak_remove_app`, `gnome_ext_set_enabled`, `gnome_ext_enabled`, `in_terminal` and `require_terminal`.
+`flatpak_remove_app`, `gnome_ext_set_enabled`, `gnome_ext_enabled`, `in_terminal`, `require_terminal`,
+and `app_dirs`/`app_info`/`app_installed`/`app_run` for scripts that work across apps.
 A Flathub app needs only three one-line scripts; see `apps/localsend/`. So does a GNOME Shell
 extension without settings, using `gnome_ext_install`/`gnome_ext_installed`/`gnome_ext_enable`/
 `gnome_ext_remove`; see `apps/window-gestures/`.
