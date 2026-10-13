@@ -1,0 +1,4 @@
+#!/bin/bash
+# Turn the extension on.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+gnome_ext_enable edge-back@jamesbondini "Swipe in from the left edge to go back."

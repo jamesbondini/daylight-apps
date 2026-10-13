@@ -1,0 +1,17 @@
+/* The arrow that follows the finger in from the edge */
+.edge-back-arrow {
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+/* Far enough: letting go now goes back */
+.edge-back-arrow.armed {
+  background-color: #000;
+}
+
+.edge-back-arrow StIcon {
+  icon-size: 28px;
+}

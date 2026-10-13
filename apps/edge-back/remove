@@ -1,0 +1,4 @@
+#!/bin/bash
+# Disable and remove the edge-back extension.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+gnome_ext_remove edge-back@jamesbondini "Edge swipe back is off."

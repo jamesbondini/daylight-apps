@@ -111,6 +111,7 @@ after installing one for the first time.
 
 | App                  | What it does |
 |----------------------|--------------|
+| Edge Swipe Back      | Swipe in from the left edge of the screen to go back in the app under your finger, like on a phone. An arrow follows your finger and darkens once letting go will go back (after 120 px, or with a flick). Sends the app its Back shortcut: Alt+Left (browsers, Files, Settings and other GNOME apps), Ctrl+Alt+Left in Obsidian, Ctrl+Alt+- in VS Code. Swipes in terminals stay with the terminal |
 | AirPods              | Quick Settings tile showing battery per AirPod and case, listening mode, adaptive level, Conversation Awareness and One-Bud ANC; pauses media when you take them out. Talks to the AirPods directly over a BlueZ L2CAP socket, using the protocol reverse-engineered by [librepods](https://github.com/kavishdevar/librepods) / [omarchy-pods](https://github.com/MB-JAMBON/omarchy-pods); no daemon. "Pair AirPods" opens Bluetooth settings |
 | Hardware Buttons     | Gives the two programmable buttons (`XF86Launch1`, `XF86Launch2`) one action for a press and one for a hold, picked on the app's page: an app, Overview, screenshot, voice typing, dark style, a command and more. Takes them over from GNOME Shell's own shortcuts and gives them back when turned off |
 | Maximize New Windows | Opens new windows maximized, see [dc-1-pmos#10](https://github.com/denysvitali/dc-1-pmos/issues/10) |
