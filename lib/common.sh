@@ -142,6 +142,81 @@ gnome_ext_enabled() {
   esac
 }
 
+# The install, installed, enable and remove scripts of an extension that is
+# just copied from extensions/<uuid> (no settings schema). Each takes the
+# UUID, and install/enable/remove the message to show once it is done.
+gnome_ext_dir() { echo "$HOME/.local/share/gnome-shell/extensions/$1"; }
+
+gnome_ext_active() {
+  gnome-extensions info "$1" 2>/dev/null | grep -q "State: ACTIVE"
+}
+
+gnome_ext_install() {
+  local uuid="$1" active="$2"
+  local src dest
+  src="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../extensions/$uuid"
+  dest=$(gnome_ext_dir "$uuid")
+
+  # Update leaves an extension the user turned off switched off
+  local was_off=
+  [ -f "$dest/extension.js" ] && ! gnome_ext_enabled "$uuid" && was_off=1
+
+  step "Copying extension to $dest"
+  rm -rf "$dest"
+  mkdir -p "$dest"
+  cp -r "$src"/. "$dest"/
+
+  if [ -n "$was_off" ]; then
+    step "Done"
+    info "Updated. It is still turned off; use the switch above to turn it on."
+    return 0
+  fi
+
+  step "Enabling extension"
+  gnome_ext_set_enabled "$uuid" true
+
+  step "Done"
+  if gnome_ext_active "$uuid"; then
+    info "Active. $active"
+  else
+    info "Log out and back in to activate it (Wayland only loads new extensions at login)."
+  fi
+}
+
+gnome_ext_installed() {
+  local uuid="$1" state
+  [ -f "$(gnome_ext_dir "$uuid")/extension.js" ] || return 1
+  state=$(gnome-extensions info "$uuid" 2>/dev/null | awk -F': ' '/State:/ {print $2}' || true)
+  case "$state" in
+    ACTIVE)  echo "Active" ;;
+    INACTIVE|DISABLED) echo "Disabled" ;;
+    *)       echo "Log out and back in to activate" ;;
+  esac
+}
+
+gnome_ext_enable() {
+  local uuid="$1" on="$2"
+  step "Enabling extension"
+  gnome_ext_set_enabled "$uuid" true
+  if gnome_ext_active "$uuid"; then
+    info "On. $on"
+  else
+    info "Log out and back in to activate it."
+  fi
+}
+
+gnome_ext_remove() {
+  local uuid="$1" done="$2"
+  step "Disabling extension"
+  gnome_ext_set_enabled "$uuid" false
+
+  step "Removing files"
+  rm -rf "$(gnome_ext_dir "$uuid")"
+
+  step "Done"
+  info "$done"
+}
+
 # Speech model voice typing uses: the one picked in the Tablet Keyboard
 # settings, else the first downloaded (see apps/voice-typing/models). Prints
 # nothing when there is none.

@@ -63,7 +63,8 @@ source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 ```
 
 It sets `set -euo pipefail` and provides `step`/`info`/`fail` (the `==>` / indented output style),
-`as_root`, apk and Flatpak helpers, `gnome_ext_set_enabled`/`gnome_ext_enabled`, and
+`as_root`, apk and Flatpak helpers, `gnome_ext_set_enabled`/`gnome_ext_enabled`, the
+`gnome_ext_install`/`installed`/`enable`/`remove` scripts of an extension without settings, and
 `in_terminal`/`require_terminal`. Use these rather than reimplementing them.
 
 **`extensions/<name>@jamesbondini/`** are GNOME Shell 48 extensions (ESM gjs), each wrapped by an
