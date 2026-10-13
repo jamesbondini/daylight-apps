@@ -1,0 +1,4 @@
+#!/bin/bash
+# Disable and remove the split-view extension.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+gnome_ext_remove split-view@jamesbondini "Split View is off."

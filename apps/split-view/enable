@@ -1,0 +1,4 @@
+#!/bin/bash
+# Turn the extension on.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+gnome_ext_enable split-view@jamesbondini "Drag a window down by its title bar and to the left or right edge to split the screen."

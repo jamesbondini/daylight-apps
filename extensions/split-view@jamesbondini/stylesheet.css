@@ -1,0 +1,34 @@
+/* The bar between the two windows, with a grip in the middle */
+.split-view-bar {
+  background-color: #000;
+}
+
+.split-view-handle {
+  width: 6px;
+  height: 48px;
+  border-radius: 3px;
+  background-color: #999;
+}
+
+/* Darkens the empty side while picking the second window */
+.split-view-picker {
+  background-color: rgba(0, 0, 0, 0.75);
+}
+
+.split-view-thumbnails {
+  spacing: 24px;
+}
+
+.split-view-thumbnail {
+  padding: 6px;
+  border-radius: 12px;
+}
+
+.split-view-thumbnail:active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.split-view-title {
+  color: #fff;
+  padding-top: 6px;
+}

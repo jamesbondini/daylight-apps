@@ -1,0 +1,12 @@
+{
+  "uuid": "split-view@jamesbondini",
+  "name": "Split View",
+  "description": "iPad-style Split View: drag a window down by its title bar and over to the left or right edge, then pick a second window for the other side. Drag the divider between them to resize both, snapping to a third, a half or two thirds; drag it to an edge to go back to one window, or double-tap it to swap the two sides. Dragging down from a title bar always does this, so in a browser such as Brave you can't pull a tab down to open it in its own window; dragging tabs sideways still works.",
+  "shell-version": [
+    "48"
+  ],
+  "session-modes": [
+    "user",
+    "unlock-dialog"
+  ]
+}

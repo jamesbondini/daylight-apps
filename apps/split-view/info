@@ -1,0 +1,5 @@
+NAME=Split View
+SUMMARY=Two apps side by side, like on an iPad: drag an app down by its title bar and over to the left or right edge, then pick the second app. Drag the divider to resize them, or double-tap it to swap them. In browsers, tabs can then no longer be pulled down into their own window.
+ICON=view-dual-symbolic
+WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/extensions/split-view@jamesbondini
+CATEGORY=extensions
