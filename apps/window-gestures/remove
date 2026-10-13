@@ -1,0 +1,4 @@
+#!/bin/bash
+# Disable and remove the window-gestures extension.
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+gnome_ext_remove window-gestures@jamesbondini "Window gestures are off."

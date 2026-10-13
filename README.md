@@ -117,6 +117,7 @@ after installing one for the first time.
 | Tablet Keyboard      | iPad-style on-screen keyboard. Follows the GNOME input source and adds an Esc/Tab/Ctrl/arrows row in terminals; hold the hide key for settings (height, split keyboard, autocorrect) |
 | Two-Finger Scroll    | Dragging two fingers over Ghostty, Console or another terminal scrolls it like a touchpad, with momentum |
 | Voice Typing         | Add-on for Tablet Keyboard: `apk add whisper.cpp` + a `dictate` helper that adds a microphone key (hold to talk, or tap to start and stop). Nothing is downloaded until you pick a model from the Speech Models list, which shows the space they use and lets you remove each one: Whisper base.en (English, recommended, 148 MB), multilingual Whisper tiny, base or small (99 languages, 78–488 MB) or Parakeet 0.6B v3 (25 European languages, recommended, 416 MB, or 669 MB at higher precision). Downloads are checked against their SHA-256, and the mic key shows their progress. The keyboard settings pick the model, a fixed language for multilingual Whisper, and a battery saver that uses the efficient CPU cores. The list lives in `apps/voice-typing/models`. "Try It" records in a terminal |
+| Window Gestures      | iPad-style gestures. Swipe four fingers left or right to switch to the next or previous window on the workspace, in the order they were opened; the window follows your fingers with its neighbour sliding in beside it, and lifting past a quarter of the screen (or flicking) switches. Pinch five fingers together to close the window under them; it shrinks as you pinch and springs back if you don't pinch far enough |
 
 ## Adding an app
 
@@ -138,7 +139,9 @@ Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
 Scripts source `lib/common.sh` for `step`, `info`, `fail`, `as_root` (one polkit prompt per
 call), `apk_present`, `apk_add_cmd`/`apk_del_cmd`, `flatpak_install_app`/`flatpak_status`/
 `flatpak_remove_app`, `gnome_ext_set_enabled`, `gnome_ext_enabled`, `in_terminal` and `require_terminal`.
-A Flathub app needs only three one-line scripts; see `apps/localsend/`.
+A Flathub app needs only three one-line scripts; see `apps/localsend/`. So does a GNOME Shell
+extension without settings, using `gnome_ext_install`/`gnome_ext_installed`/`gnome_ext_enable`/
+`gnome_ext_remove`; see `apps/window-gestures/`.
 Every script also works directly from a terminal, e.g. `apps/tailscale/install`.
 URLs printed by a script become clickable buttons in the app.
 
