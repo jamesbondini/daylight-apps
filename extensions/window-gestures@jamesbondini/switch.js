@@ -96,6 +96,15 @@ export class WindowSwitcher {
         // Swiping left (negative) brings in the next window from the right.
         this._next = n > 1 ? windows[(i + 1) % n] : null;
         this._prev = n > 1 ? windows[(i - 1 + n) % n] : null;
+        // A neighbour that closes mid-swipe can't be switched to
+        for (const neighbour of new Set([this._next, this._prev])) {
+            neighbour?.connectObject('unmanaging', () => {
+                if (this._next === neighbour)
+                    this._next = null;
+                if (this._prev === neighbour)
+                    this._prev = null;
+            }, this);
+        }
 
         // Clones of the window and its neighbours slide over a backdrop of
         // the wallpaper, which hides the windows stacked behind. Moving the
@@ -185,7 +194,7 @@ export class WindowSwitcher {
     _finish(target) {
         if (!this._window || this._restackedId)
             return;
-        if (!target || target.unmanaging) {
+        if (!target || (target !== this._next && target !== this._prev)) {
             this._reset();
             return;
         }
@@ -223,6 +232,8 @@ export class WindowSwitcher {
         this._backdrop = null;
         this._actor = null;
         this._window = null;
+        this._next?.disconnectObject(this);
+        this._prev?.disconnectObject(this);
         this._next = null;
         this._prev = null;
         this._animating = false;

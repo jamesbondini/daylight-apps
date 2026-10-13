@@ -145,7 +145,7 @@ export class PinchToClose {
         const {x, y} = this.gesture.centroid();
         const window = this._windowAt(x, y);
         if (window?.get_window_type() !== Meta.WindowType.NORMAL ||
-            !window.can_close() || window.unmanaging)
+            !window.can_close())
             return false;
         this._target = window;
         return true;
@@ -161,7 +161,7 @@ export class PinchToClose {
     _begin() {
         // The window from the last pinch may still be waiting to close.
         this._springBack();
-        this._window = this._target;
+        this._setWindow(this._target);
         this._target = null;
         this._setActor(this._window.get_compositor_private());
         if (!this._actor)
@@ -189,7 +189,7 @@ export class PinchToClose {
 
     _end() {
         const window = this._window;
-        if (this.gesture.scale > CLOSE || !window || window.unmanaging || !this._actor) {
+        if (this.gesture.scale > CLOSE || !window || !this._actor) {
             this._springBack();
             return;
         }
@@ -222,7 +222,7 @@ export class PinchToClose {
         this._closing = false;
         const actor = this._actor;
         this._setActor(null);
-        this._window = null;
+        this._setWindow(null);
         if (!actor)
             return;
         actor.ease({
@@ -233,6 +233,19 @@ export class PinchToClose {
             mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
             onStopped: () => actor.set_pivot_point(0, 0),
         });
+    }
+
+    // Once the window closes there is nothing to bring back; GNOME's close
+    // animation takes over its actor.
+    _setWindow(window) {
+        this._window?.disconnectObject(this);
+        this._window = window;
+        window?.connectObject('unmanaging', () => {
+            this._clearRestore();
+            this._closing = false;
+            this._setActor(null);
+            this._setWindow(null);
+        }, this);
     }
 
     _clearRestore() {
@@ -253,6 +266,6 @@ export class PinchToClose {
             this._actor.set_pivot_point(0, 0);
         }
         this._setActor(null);
-        this._window = null;
+        this._setWindow(null);
     }
 }
