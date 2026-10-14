@@ -100,6 +100,7 @@ VPN, Leo, News and telemetry (Brave Origin has no musl build).
 |-------------|----------------------------------------------------------------------|-----------------------------------------|
 | Claude Code | Official native installer (`claude.ai/install.sh`, arm64-musl) + `libgcc libstdc++ ripgrep wl-clipboard` | Opens `claude` in a terminal to sign in |
 | Crash Helper | Systemd user service following systemd-coredump, plus `crash-diagnose`, `crash-mute` and a `diagnose-crash` skill for Claude Code (needs Claude Code) | None; “Diagnose Last Crash” opens the latest |
+| herdr       | Official installer (`herdr.dev/install.sh`, static arm64 binary in `~/.local/bin`) | Opens `herdr` in a terminal |
 | Neovim      | Flathub `io.neovim.nvim` + an `nvim` command in `~/.local/bin`        | Opens `nvim` in a terminal              |
 | VS Code     | Flathub `com.visualstudio.code`                                       | None                                    |
 

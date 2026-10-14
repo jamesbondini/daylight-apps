@@ -1,0 +1,10 @@
+#!/bin/bash
+# Install herdr with its official installer (a static ARM64 binary, so it runs on musl).
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+step "Running the official herdr installer"
+curl -fsSL https://herdr.dev/install.sh | sh
+
+step "Done"
+"$HOME/.local/bin/herdr" --version
+info "Press “Open in Terminal” to start it."

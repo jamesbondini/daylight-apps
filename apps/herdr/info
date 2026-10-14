@@ -1,0 +1,6 @@
+NAME=herdr
+SUMMARY=Runs several AI coding agents side by side in the terminal and shows which ones are working, waiting for you or done. Sessions keep running when you close the window.
+ICON=utilities-terminal-symbolic
+WEBSITE=https://herdr.dev
+SETUP_LABEL=Open in Terminal
+CATEGORY=developer

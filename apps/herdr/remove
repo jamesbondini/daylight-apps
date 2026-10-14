@@ -1,0 +1,16 @@
+#!/bin/bash
+# Remove herdr. Keeps ~/.config/herdr (settings and saved machines).
+source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
+
+HERDR="$HOME/.local/bin/herdr"
+# Stop the background server so no sessions are left running without the binary.
+if [ -x "$HERDR" ]; then
+  step "Stopping herdr"
+  "$HERDR" server stop >/dev/null 2>&1 || true
+fi
+
+step "Removing herdr"
+rm -f "$HERDR"
+
+step "Done"
+info "Kept your settings in ~/.config/herdr."
