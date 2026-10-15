@@ -22,6 +22,14 @@ import {Dictation} from './voice.js';
 
 const LONG_PRESS_MS = 450;
 const TRACKPAD_PRESS_MS = 400;
+// Sliding sideways this far (in key widths) on the space bar starts moving
+// the cursor without waiting for TRACKPAD_PRESS_MS
+const TRACKPAD_SLIDE_UNITS = 0.3;
+// Finger travel per character at slow speed, in key widths; faster swipes
+// move up to TRACKPAD_MAX_GAIN times as many characters for the same travel
+const TRACKPAD_STEP_UNITS = 0.13;
+const TRACKPAD_FAST_UNITS_PER_S = 2;
+const TRACKPAD_MAX_GAIN = 4;
 const DELETE_REPEAT_MS = 450;
 // Held backspace starts at DELETE_CHAR_SLOW_MS per letter and speeds up to
 // DELETE_CHAR_MS, then switches to whole words
@@ -1930,6 +1938,17 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         const dx = touch.x - touch.x0;
         const dy = touch.y - touch.y0;
 
+        if (key?.spec.kind === 'space' && !touch.slide &&
+            Math.abs(dx) > this._grid.unitWidth * TRACKPAD_SLIDE_UNITS &&
+            Math.abs(dx) > Math.abs(dy) * 1.5) {
+            this._clearTimer(touch);
+            this._startTrackpad(touch);
+            // Count the slide that started it, so the cursor keeps up
+            touch.tx = touch.x0;
+            this._moveTrackpad(touch);
+            return;
+        }
+
         if (key?.spec.kind === 'char' && key.spec.alt && !touch.slide &&
             dy > flickStart(key) && dy > Math.abs(dx)) {
             this._clearTimer(touch);
@@ -1986,12 +2005,25 @@ class TabletKeyboard extends KeyboardUI.Keyboard {
         touch.mode = 'trackpad';
         touch.tx = touch.x;
         touch.ty = touch.y;
+        touch.lastX = touch.x;
+        touch.lastTime = GLib.get_monotonic_time();
+        touch.speed = 0;
         this._grid.add_style_class_name('tk-trackpad');
     }
 
     _moveTrackpad(touch) {
-        const stepX = this._grid.unitWidth * 0.45;
-        const stepY = this._grid.rowHeight * 0.9;
+        const unit = this._grid.unitWidth;
+        const stepY = this._grid.rowHeight * 0.7;
+
+        // Smoothed finger speed in key widths per second drives acceleration
+        const now = GLib.get_monotonic_time();
+        const dt = Math.max(now - touch.lastTime, 1000) / 1e6;
+        const speed = Math.abs(touch.x - touch.lastX) / unit / dt;
+        touch.speed = touch.speed * 0.5 + speed * 0.5;
+        touch.lastX = touch.x;
+        touch.lastTime = now;
+        const gain = Math.clamp(touch.speed / TRACKPAD_FAST_UNITS_PER_S, 1, TRACKPAD_MAX_GAIN);
+        const stepX = unit * TRACKPAD_STEP_UNITS / gain;
 
         while (touch.x - touch.tx >= stepX) {
             this._sendKeyval(Clutter.KEY_Right);
