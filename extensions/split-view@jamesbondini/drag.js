@@ -17,6 +17,12 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 // sideways or scrolling still works.
 const TITLE_BAR = 48;
 
+// How far (px) the finger must move before the drag starts. Apps start
+// their own window move once a finger has moved 8 px on the title bar (GTK's
+// drag threshold), and whichever is first gets the touch, so this has to be
+// less than that. Clutter's default is 16.
+const BEGIN_THRESHOLD = 6;
+
 // Share of the screen width at each side where letting go puts the window
 // on that side.
 const EDGE = 0.2;
@@ -29,7 +35,10 @@ export class TitleBarDrag {
     constructor(split) {
         this._split = split;
         this._side = null;
-        this.gesture = new Clutter.PanGesture({max_n_points: 1});
+        this.gesture = new Clutter.PanGesture({
+            max_n_points: 1,
+            begin_threshold: BEGIN_THRESHOLD,
+        });
         this.gesture.connect('may-recognize', () => this._mayRecognize());
         this.gesture.connect('recognize', () => this._begin());
         this.gesture.connect('pan-update', () => this._update());
