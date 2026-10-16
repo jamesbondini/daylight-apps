@@ -1,4 +1,4 @@
 #!/bin/bash
 # Turn the extension on.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
-gnome_ext_enable maximize-new-windows@jamesbondini "New windows will open maximized."
+gnome_ext_enable maximize-new-windows@dawnos "New windows will open maximized."

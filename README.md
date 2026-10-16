@@ -1,13 +1,15 @@
 <p align="center">
-  <img src="data/io.github.jamesbondini.DaylightApps.svg" width="128" alt="Daylight Apps icon: a sun rising over a row of apps">
+  <img src="data/io.github.jamesbondini.dInstaller.svg" width="128" alt="dInstaller icon: a sun rising over a row of apps">
 </p>
 
-# Daylight Apps
+# dInstaller
+
+The installer of **dawnOS**, the suite of apps for the Daylight DC-1 (formerly Daylight Apps).
 
 A small GTK/libadwaita installer for the Daylight DC-1 (Nura / postmarketOS, aarch64, musl),
 modelled on Omarchy's `omarchy-install-*` / `omarchy-installed-*` / `omarchy-remove-*` scripts.
 
-**[Latest release](https://github.com/jamesbondini/daylight-apps/releases/latest)**: what's included and how to install.
+**[Latest release](https://github.com/jamesbondini/dInstaller/releases/latest)**: what's included and how to install.
 
 <p align="center">
   <img src="docs/tablet-keyboard.jpg" width="420" alt="Daylight DC-1 showing daylightcomputer.com in the browser with the Tablet Keyboard open">
@@ -20,11 +22,11 @@ modelled on Omarchy's `omarchy-install-*` / `omarchy-installed-*` / `omarchy-rem
 Run this in a terminal:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jamesbondini/daylight-apps/main/get.sh | bash
+curl -fsSL https://raw.githubusercontent.com/jamesbondini/dInstaller/main/get.sh | bash
 ```
 
 It installs the dependencies (asking for your password if any are missing), downloads
-Daylight Apps to `~/Projects/daylight-apps` and adds it to the app grid. Run it again to update.
+dInstaller to `~/Projects/dInstaller` and adds it to the app grid. Run it again to update.
 
 ### Step by step
 
@@ -34,20 +36,20 @@ Or do the same by hand. Install the dependencies (most are already present on Nu
 sudo apk add git python3 py3-gobject3 gtk4.0 libadwaita
 ```
 
-Download Daylight Apps and add it to the app grid:
+Download dInstaller and add it to the app grid:
 
 ```sh
-git clone https://github.com/jamesbondini/daylight-apps.git ~/Projects/daylight-apps
-cd ~/Projects/daylight-apps
+git clone https://github.com/jamesbondini/dInstaller.git ~/Projects/dInstaller
+cd ~/Projects/dInstaller
 ./install.sh
 ```
 
-Then open **Daylight Apps** from the app grid, or run `daylight-apps` in a terminal.
+Then open **dInstaller** from the app grid, or run `dinstaller` in a terminal.
 
 To update later:
 
 ```sh
-cd ~/Projects/daylight-apps && git pull
+cd ~/Projects/dInstaller && git pull
 ```
 
 `install.sh` links to the cloned folder, so keep it where you cloned it
@@ -63,7 +65,7 @@ Maximize New Windows, Two-Finger Scroll, Window Gestures, Edge Swipe Back and Ha
 The apk packages they list in `PACKAGES=` are installed together first, so it asks for your
 password once.
 
-**Update All** (the button at the top right) runs `lib/update-all`: it pulls Daylight Apps itself
+**Update All** (the button at the top right) runs `lib/update-all`: it pulls dInstaller itself
 (skipped if the checkout has local changes), upgrades the system packages and any Flatpaks
 installed for all users with one password prompt, updates your Flatpak apps, and then runs the
 `install` script of every installed app again. Those normally only need root to add missing
@@ -136,7 +138,7 @@ after installing one for the first time.
 
 ## Adding an app
 
-Create `apps/<id>/` (or `~/.config/daylight-apps/apps/<id>/`) containing:
+Create `apps/<id>/` (or `~/.config/dinstaller/apps/<id>/`) containing:
 
 - `info`: `NAME=`, `SUMMARY=`, `ICON=` (space-separated icon names, first found wins),
   `CATEGORY=` (`setup` for Start Here, `apps`, `developer`, `services` or `extensions`; defaults to `apps`),

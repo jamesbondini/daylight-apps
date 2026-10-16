@@ -2,7 +2,7 @@
 # Disable and remove the Tablet Keyboard extension.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-UUID=tablet-keyboard@jamesbondini
+UUID=tablet-keyboard@dawnos
 
 step "Disabling extension"
 gnome_ext_set_enabled "$UUID" false

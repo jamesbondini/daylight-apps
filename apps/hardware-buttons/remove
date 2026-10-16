@@ -2,7 +2,7 @@
 # Disable and remove the hardware-buttons extension. Button settings are kept.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-UUID=hardware-buttons@jamesbondini
+UUID=hardware-buttons@dawnos
 
 step "Disabling extension"
 gnome_ext_set_enabled "$UUID" false

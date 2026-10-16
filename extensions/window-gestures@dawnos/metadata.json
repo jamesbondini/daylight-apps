@@ -1,5 +1,5 @@
 {
-  "uuid": "window-gestures@jamesbondini",
+  "uuid": "window-gestures@dawnos",
   "name": "Window Gestures",
   "description": "iPad-style multi-finger gestures: swipe four fingers left or right to switch to the next or previous window, with its neighbour sliding in beside it, and pinch five fingers together to close the window under them.",
   "shell-version": ["48"]

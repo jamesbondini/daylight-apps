@@ -1,5 +1,5 @@
 {
-  "uuid": "edge-back@jamesbondini",
+  "uuid": "edge-back@dawnos",
   "name": "Edge Swipe Back",
   "description": "Swipe in from the left edge of the screen to go back in the app under your finger, like on a phone: an arrow follows your finger, and letting go once it is highlighted goes back.",
   "shell-version": ["48"]

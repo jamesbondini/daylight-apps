@@ -8,7 +8,7 @@ import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/ex
 import {VOICE_DIR, readModels, voiceFileSize} from './voicemodels.js';
 
 const SCHEMES = ['mono', 'mono-light', 'mono-dark', 'system', 'light', 'dark'];
-// Installed by the Daylight Apps "Voice Typing" app
+// Installed by the dInstaller "Voice Typing" app
 const VOICE_HELPER = GLib.build_filenamev([VOICE_DIR, 'dictate']);
 
 // Languages offered for the multilingual Whisper models, as Whisper codes;

@@ -222,17 +222,17 @@ gnome_ext_remove() {
 # settings, else the first downloaded (see apps/voice-typing/models). Prints
 # nothing when there is none.
 voice_engine() {
-  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@jamesbondini/schemas"
+  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@dawnos/schemas"
   local picked
   picked=$(gsettings --schemadir "$schemas" get org.gnome.shell.extensions.tablet-keyboard voice-engine \
     2>/dev/null | tr -d "'") || true
-  "${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing/dictate" --resolve "$picked" 2>/dev/null || true
+  "${XDG_DATA_HOME:-$HOME/.local/share}/dinstaller/voice-typing/dictate" --resolve "$picked" 2>/dev/null || true
 }
 
 # Pick the speech model voice typing uses, or with no argument go back to the
 # first downloaded one. Older keyboard schemas only know whisper and parakeet.
 voice_set_engine() {
-  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@jamesbondini/schemas"
+  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@dawnos/schemas"
   if [ -n "${1:-}" ]; then
     gsettings --schemadir "$schemas" set org.gnome.shell.extensions.tablet-keyboard voice-engine "$1"
   else
@@ -243,7 +243,7 @@ voice_set_engine() {
 # The dictate options for the keyboard's Language and Battery saver settings,
 # one per line
 voice_options() {
-  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@jamesbondini/schemas"
+  local schemas="$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@dawnos/schemas"
   local key=org.gnome.shell.extensions.tablet-keyboard language saver
   language=$(gsettings --schemadir "$schemas" get $key voice-language 2>/dev/null | tr -d "'") || true
   saver=$(gsettings --schemadir "$schemas" get $key voice-battery-saver 2>/dev/null) || true
@@ -264,15 +264,15 @@ schema = src.lookup("org.gnome.shell.extensions.tablet-keyboard", False)
 if schema and schema.has_key("voice-words"):
     for w in Gio.Settings.new_full(schema, None, None).get_strv("voice-words"):
         print(w)
-' "$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@jamesbondini/schemas" 2>/dev/null
+' "$HOME/.local/share/gnome-shell/extensions/tablet-keyboard@dawnos/schemas" 2>/dev/null
 }
 
 # App recipe directories, one per line, sorted by id. Ones in
-# ~/.config/daylight-apps/apps override built-ins with the same id, as in the GUI.
+# ~/.config/dinstaller/apps override built-ins with the same id, as in the GUI.
 app_dirs() {
   local repo user dir id
   repo="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../apps"
-  user="${XDG_CONFIG_HOME:-$HOME/.config}/daylight-apps/apps"
+  user="${XDG_CONFIG_HOME:-$HOME/.config}/dinstaller/apps"
   local -A dirs=()
   for dir in "$repo"/*/ "$user"/*/; do
     [ -f "$dir/info" ] && [ -f "$dir/install" ] || continue

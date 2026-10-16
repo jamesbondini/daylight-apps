@@ -8,12 +8,12 @@ WRAPPER="$HOME/.local/bin/nvim"
 step "Installing Neovim from Flathub"
 flatpak_install_app "$APP"
 
-if [ -e "$WRAPPER" ] && ! grep -q "daylight-apps" "$WRAPPER" 2>/dev/null; then
+if [ -e "$WRAPPER" ] && ! grep -qE "daylight-apps|dinstaller" "$WRAPPER" 2>/dev/null; then
   info "Leaving existing $WRAPPER alone."
 else
   step "Adding nvim command to ~/.local/bin"
   mkdir -p "$HOME/.local/bin"
-  printf '#!/bin/sh\n# Added by daylight-apps: run the Neovim Flatpak.\nexec flatpak run io.neovim.nvim "$@"\n' > "$WRAPPER"
+  printf '#!/bin/sh\n# Added by dinstaller: run the Neovim Flatpak.\nexec flatpak run io.neovim.nvim "$@"\n' > "$WRAPPER"
   chmod +x "$WRAPPER"
 fi
 

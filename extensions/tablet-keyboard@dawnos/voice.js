@@ -1,4 +1,4 @@
-// Voice typing through the Daylight Apps "Voice Typing" helper.
+// Voice typing through the dInstaller "Voice Typing" helper.
 //
 // The helper (installed by apps/voice-typing) records from the microphone
 // until its stdin closes, then prints the transcription from whisper.cpp's
@@ -190,7 +190,7 @@ export class Dictation {
         // Nothing is downloaded without the user picking it
         if (!this._engine) {
             Main.notify('Voice typing', 'Pick a speech model first, under Speech Models in ' +
-                'Daylight Apps (Voice Typing), or under Voice typing in the keyboard settings.');
+                'dInstaller (Voice Typing), or under Voice typing in the keyboard settings.');
             return;
         }
         if (!modelPresent(this._engine)) {

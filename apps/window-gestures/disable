@@ -3,5 +3,5 @@
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
 step "Disabling extension"
-gnome_ext_set_enabled window-gestures@jamesbondini false
+gnome_ext_set_enabled window-gestures@dawnos false
 info "Off. Four- and five-finger gestures go to the app again."

@@ -1,4 +1,4 @@
 #!/bin/bash
 # Turn the extension on.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
-gnome_ext_enable two-finger-scroll@jamesbondini "Drag two fingers over a terminal to scroll it."
+gnome_ext_enable two-finger-scroll@dawnos "Drag two fingers over a terminal to scroll it."

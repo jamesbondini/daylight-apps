@@ -1,6 +1,6 @@
 NAME=Window Gestures
 SUMMARY=Swipe four fingers left or right to switch to the next or previous window, and pinch five fingers to close one, like on an iPad.
 ICON=focus-windows-symbolic input-touchpad-symbolic
-WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/extensions/window-gestures@jamesbondini
+WEBSITE=https://github.com/jamesbondini/dInstaller/tree/main/extensions/window-gestures@dawnos
 CATEGORY=extensions
 RECOMMENDED=yes

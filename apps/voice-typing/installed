@@ -2,12 +2,12 @@
 # Exit 0 if installed; print a one-line status.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-DEST="${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing"
+DEST="${XDG_DATA_HOME:-$HOME/.local/share}/dinstaller/voice-typing"
 [ -x "$DEST/dictate" ] || exit 1
 engine=$(voice_engine)
 if ! cmd_present whisper-cli || ! [ -f "$DEST/models" ]; then
   echo "Out of date, press Update"
-elif ! gnome_ext_enabled tablet-keyboard@jamesbondini; then
+elif ! gnome_ext_enabled tablet-keyboard@dawnos; then
   echo "Install Tablet Keyboard for the microphone key"
 elif [ -z "$engine" ]; then
   echo "Download a speech model below to start"

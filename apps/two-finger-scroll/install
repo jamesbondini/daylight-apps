@@ -1,4 +1,4 @@
 #!/bin/bash
 # Install and enable the bundled two-finger-scroll GNOME Shell extension.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
-gnome_ext_install two-finger-scroll@jamesbondini "Drag two fingers over a terminal to scroll it."
+gnome_ext_install two-finger-scroll@dawnos "Drag two fingers over a terminal to scroll it."

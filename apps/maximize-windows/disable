@@ -3,5 +3,5 @@
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
 step "Disabling extension"
-gnome_ext_set_enabled maximize-new-windows@jamesbondini false
+gnome_ext_set_enabled maximize-new-windows@dawnos false
 info "Off. New windows open at their normal size."

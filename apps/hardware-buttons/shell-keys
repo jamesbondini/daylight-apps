@@ -6,7 +6,7 @@
 # behaviour.
 set -e
 SCHEMA=org.gnome.shell.keybindings
-STATE="${XDG_STATE_HOME:-$HOME/.local/state}/daylight-apps/hardware-buttons-taken"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/dinstaller/hardware-buttons-taken"
 
 edit() { # key accel add|remove
   local current

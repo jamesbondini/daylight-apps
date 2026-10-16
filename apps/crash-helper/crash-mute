@@ -5,7 +5,7 @@
 #   crash-mute <program> off   let it notify again
 set -euo pipefail
 
-MUTES="${XDG_STATE_HOME:-$HOME/.local/state}/daylight-apps/crash-mute"
+MUTES="${XDG_STATE_HOME:-$HOME/.local/state}/dinstaller/crash-mute"
 
 if [ $# -eq 0 ]; then
   found=0

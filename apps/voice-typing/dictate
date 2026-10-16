@@ -24,7 +24,7 @@
 #                               exits 1 when there is none.
 set -u
 
-MODELS="${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing"
+MODELS="${XDG_DATA_HOME:-$HOME/.local/share}/dinstaller/voice-typing"
 REGISTRY="$(dirname "$(readlink -f "$0")")/models"
 
 # Sets ENGINE, LANGUAGE, BYTES, SHA256, TITLE and URL for a model ID from

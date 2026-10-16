@@ -3,5 +3,5 @@
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
 step "Disabling extension"
-gnome_ext_set_enabled edge-back@jamesbondini false
+gnome_ext_set_enabled edge-back@dawnos false
 info "Off. Swipes from the left edge go to the app again."

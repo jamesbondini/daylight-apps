@@ -12,7 +12,7 @@ description: >
 
 This machine is a Daylight DC-1 running postmarketOS (Alpine-based: aarch64, musl,
 `apk`), GNOME Shell on Wayland, with apps from apk, Flathub (per user) and
-Daylight Apps (`~/Projects/daylight-apps`).
+dInstaller (`~/Projects/dInstaller`).
 
 Work from evidence. The goal is an honest account of what happened, not a
 plausible-sounding story.
@@ -106,14 +106,14 @@ Prefer the binary path: a process name is cut to 15 characters, so muting that
 can silently match nothing. Quote it. Anything run through an interpreter is
 keyed as the interpreter, so muting `python3` silences every Python program; say
 so rather than doing it quietly. A mute is no substitute for a fix within reach.
-Crash Helper's switch in Daylight Apps turns off all notifications.
+Crash Helper's switch in dInstaller turns off all notifications.
 
 ## Reporting upstream
 
 Only with the user's explicit yes, after showing them the exact text. Find the
 right project: the app itself, Alpine aports (`gitlab.alpinelinux.org`),
 postmarketOS (`gitlab.postmarketos.org`), or, when the cause is one of the
-Daylight Apps scripts or GNOME Shell extensions, `jamesbondini/daylight-apps` on
+dInstaller scripts or GNOME Shell extensions, `jamesbondini/dInstaller` on
 GitHub. Search existing issues first, including closed ones; a matching issue
 closed as fixed is a regression worth reporting. If `gh` is not signed in, hand
 the user the finished text instead. End the report with a line naming the model

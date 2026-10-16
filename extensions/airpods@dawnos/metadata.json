@@ -1,5 +1,5 @@
 {
-  "uuid": "airpods@jamesbondini",
+  "uuid": "airpods@dawnos",
   "name": "AirPods",
   "description": "AirPods battery, listening mode, Conversation Awareness and ear detection in Quick Settings. Talks to the AirPods directly over Bluetooth through BlueZ.",
   "settings-schema": "org.gnome.shell.extensions.airpods",

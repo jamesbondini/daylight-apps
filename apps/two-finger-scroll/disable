@@ -3,5 +3,5 @@
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
 step "Disabling extension"
-gnome_ext_set_enabled two-finger-scroll@jamesbondini false
+gnome_ext_set_enabled two-finger-scroll@dawnos false
 info "Off. Two-finger drags go to the app again."

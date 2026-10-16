@@ -1,6 +1,6 @@
 NAME=Edge Swipe Back
 SUMMARY=Swipe in from the left edge of the screen to go back in browsers, Files, Settings and other apps, like on a phone.
 ICON=go-previous-symbolic
-WEBSITE=https://github.com/jamesbondini/daylight-apps/tree/main/extensions/edge-back@jamesbondini
+WEBSITE=https://github.com/jamesbondini/dInstaller/tree/main/extensions/edge-back@dawnos
 CATEGORY=extensions
 RECOMMENDED=yes

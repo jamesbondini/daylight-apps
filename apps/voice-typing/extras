@@ -8,7 +8,7 @@ engine=$(voice_engine)
 used=0
 rows=()
 # Where dictate --path puts each model, and the size dictate --size prints
-MODELS="${XDG_DATA_HOME:-$HOME/.local/share}/daylight-apps/voice-typing"
+MODELS="${XDG_DATA_HOME:-$HOME/.local/share}/dinstaller/voice-typing"
 while IFS='|' read -r id _ _ bytes _ title description url; do
   case "$id" in ''|'#'*) continue ;; esac
   have=no

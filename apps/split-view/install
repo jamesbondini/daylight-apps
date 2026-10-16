@@ -1,4 +1,4 @@
 #!/bin/bash
 # Install and enable the bundled split-view GNOME Shell extension.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
-gnome_ext_install split-view@jamesbondini "Drag a window down by its title bar and to the left or right edge to split the screen."
+gnome_ext_install split-view@dawnos "Drag a window down by its title bar and to the left or right edge to split the screen."

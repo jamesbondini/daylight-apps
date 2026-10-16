@@ -33,7 +33,7 @@ DEDUPE_SECONDS = int(os.environ.get("CRASH_HELPER_DEDUPE_SECONDS", "60"))
 # Muted by crash-mute, one empty file per program name
 MUTES = os.path.join(
     os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"),
-    "daylight-apps", "crash-mute")
+    "dinstaller", "crash-mute")
 
 DIAGNOSE = os.path.join(os.path.dirname(os.path.realpath(__file__)), "crash-diagnose")
 

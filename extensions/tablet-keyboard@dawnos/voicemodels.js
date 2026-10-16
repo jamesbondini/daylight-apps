@@ -1,11 +1,11 @@
-// The speech models file the Daylight Apps "Voice Typing" app installs next to
+// The speech models file the dInstaller "Voice Typing" app installs next to
 // its helper (apps/voice-typing/models). Shared by voice.js (in the shell) and
 // prefs.js (in the preferences process), so it imports nothing from the shell.
 
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-export const VOICE_DIR = GLib.build_filenamev([GLib.get_user_data_dir(), 'daylight-apps', 'voice-typing']);
+export const VOICE_DIR = GLib.build_filenamev([GLib.get_user_data_dir(), 'dinstaller', 'voice-typing']);
 
 // [{id, name, description, bytes, size, file}] in the file's order; empty
 // when Voice Typing isn't installed or predates the file

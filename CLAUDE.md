@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Daylight Apps is a GTK4/libadwaita installer for the Daylight DC-1 running postmarketOS (Nura):
+dInstaller (formerly Daylight Apps) is the installer of dawnOS, the suite of apps for the Daylight DC-1
+(dNotes, dBooks, dPlay, dComics, dCalc, dOperator). It is a GTK4/libadwaita installer running on postmarketOS (Nura):
 **aarch64, musl, BusyBox userland, GNOME Shell 48 on Wayland**. It is modelled on Omarchy's
 `omarchy-install-*` / `omarchy-installed-*` / `omarchy-remove-*` scripts. Development happens on the
 device itself, so commands can be run and the app tested right here.
@@ -17,12 +18,12 @@ contract). Keep it in sync when adding, removing or changing what an app does.
 There is no build step, test suite or linter config.
 
 ```sh
-./daylight-apps.py                 # run the GUI straight from the checkout
-./install.sh                       # register it in the app grid / as `daylight-apps` (symlinks to this checkout)
+./dinstaller.py                    # run the GUI straight from the checkout
+./install.sh                       # register it in the app grid / as `dinstaller` (symlinks to this checkout)
 apps/<id>/install                  # every app script also runs directly from a terminal
 apps/<id>/installed; echo $?       # check status: exit code + first line of stdout
 bash -n apps/<id>/<script>         # syntax-check a script
-python3 -m py_compile daylight-apps.py apps/*/page.py
+python3 -m py_compile dinstaller.py apps/*/page.py
 journalctl -b -o cat /usr/bin/gnome-shell   # GNOME Shell extension logs/errors
 ```
 
@@ -33,8 +34,8 @@ reloads extension JS after logging out and in.
 
 ## Architecture
 
-**`daylight-apps.py`** (single file) discovers app recipes in `apps/` and
-`~/.config/daylight-apps/apps/` (user dir overrides built-ins by id). It knows nothing about any
+**`dinstaller.py`** (single file) discovers app recipes in `apps/` and
+`~/.config/dinstaller/apps/` (user dir overrides built-ins by id). It knows nothing about any
 particular app: all behaviour lives in each `apps/<id>/` directory's executable scripts, and the GUI
 only runs them and interprets their output. The script contract (`info`, `install`, `installed`,
 `remove`, optional `setup`, `enabled`/`enable`/`disable`, `extras`/`extra-add`/`extra-remove`,
@@ -49,7 +50,7 @@ How the GUI runs scripts, which shapes how scripts should be written:
 - `enable`/`disable`: the last non-`==>` output line becomes the toast.
 - Scripts without a terminal (GUI) that need keyboard input call `require_terminal "$0"`, which
   re-execs them in GNOME Console (`kgx`), falling back to Ghostty.
-- `info` `CATEGORY` values map to groups via `CATEGORIES` in `daylight-apps.py`: `setup` (Start Here),
+- `info` `CATEGORY` values map to groups via `CATEGORIES` in `dinstaller.py`: `setup` (Start Here),
   `apps`, `developer`, `services`, `extensions`. `NEEDS=<id ...>` gates the Install button until
   those apps are installed.
 - `page.py` is imported in-process; `build(window)` returns a widget. Exceptions are caught and
@@ -74,24 +75,25 @@ It sets `set -euo pipefail` and provides `step`/`info`/`fail` (the `==>` / inden
 `gnome_ext_install`/`installed`/`enable`/`remove` scripts of an extension without settings, and
 `in_terminal`/`require_terminal`. Use these rather than reimplementing them.
 
-**`extensions/<name>@jamesbondini/`** are GNOME Shell 48 extensions (ESM gjs), each wrapped by an
+**`extensions/<name>@dawnos/`** are GNOME Shell 48 extensions (ESM gjs), each wrapped by an
 `apps/<id>/` recipe in the `extensions` category. Some span both sides:
 - Hardware Buttons: settings UI is `apps/hardware-buttons/page.py`; the extension reads the same
   GSettings schema. `shell-keys` takes over/returns GNOME's own shortcuts for those keys.
 - Voice Typing is an add-on to Tablet Keyboard: `apps/voice-typing/dictate` and the speech model
-  registry `apps/voice-typing/models` are installed to `~/.local/share/daylight-apps/voice-typing/`.
+  registry `apps/voice-typing/models` are installed to `~/.local/share/dinstaller/voice-typing/`.
   The keyboard's `voice.js` runs `dictate`; the keyboard (`voicemodels.js`) and the app's scripts
   all read the installed `models`, so a model is added by adding a line there. Its `voice-engine`
   setting stores a model ID; empty means the first downloaded model.
 
 Paired lists that must be kept in sync by hand (each side has a comment pointing at the other):
-- `ACTIONS` in `apps/hardware-buttons/page.py` ↔ `extensions/hardware-buttons@jamesbondini/extension.js`
+- `ACTIONS` in `apps/hardware-buttons/page.py` ↔ `extensions/hardware-buttons@dawnos/extension.js`
 - `PACKAGES=` in an app's `info` ↔ the apk packages its `install` adds (`apps/clipboard-tools/`,
   `apps/flatpak/` ↔ `ensure_flatpak`); a missing one means a second password prompt in Recommended Apps
 
-**IDs**: extension UUIDs use `@jamesbondini`, app/desktop ids `io.github.jamesbondini.*`.
-`lib/migrate-ids.sh` (run by `install.sh`) moves old `@finni` / `dev.finni.*` installs over; keep it
-idempotent.
+**IDs**: extension UUIDs use `@dawnos`, app/desktop ids `io.github.jamesbondini.*`.
+`lib/migrate-ids.sh` (run by `install.sh`) moves old `@finni` / `@jamesbondini` / `dev.finni.*` installs and
+Daylight Apps' `daylight-apps` folders over; keep it idempotent. `daylight-apps.py` is a link to
+`dinstaller.py` so launchers from before the rename keep working until `install.sh` runs.
 
 ## Platform gotchas
 
@@ -101,7 +103,7 @@ idempotent.
 - `as_root` shows one polkit prompt per call, so batch all privileged work into a single call.
 - Flathub apps are installed `--user`; they only appear in the app grid after Flatpak's first
   logout/login. A Flathub app needs just three one-line scripts (see `apps/localsend/`).
-- Per-app data lives under `~/.local/share/daylight-apps/<id>/`; `remove` should keep user
+- Per-app data lives under `~/.local/share/dinstaller/<id>/`; `remove` should keep user
   settings and data (the Remove dialog promises this).
 
 ## Conventions

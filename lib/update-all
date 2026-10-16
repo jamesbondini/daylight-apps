@@ -1,5 +1,5 @@
 #!/bin/bash
-# Update everything: Daylight Apps itself, the system packages (one password
+# Update everything: dInstaller itself, the system packages (one password
 # prompt), Flatpak apps, then each installed app by running its install
 # script again, which by then usually has nothing left that needs root.
 source "$(dirname "$(readlink -f "$0")")/common.sh"
@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 main() {
   local failed=() reopen= extensions=
 
-  step "Updating Daylight Apps"
+  step "Updating dInstaller"
   if ! git -C "$ROOT" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
     info "Skipped: $ROOT is not a git clone that follows a branch."
   elif [ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no)" ]; then
@@ -24,11 +24,11 @@ main() {
     if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh} -o BatchMode=yes" \
         git -C "$ROOT" pull --ff-only; then
       if [ "$(git -C "$ROOT" rev-parse HEAD)" != "$before" ]; then
-        "$ROOT/install.sh" || failed+=("Daylight Apps")
-        git -C "$ROOT" diff --quiet "$before" HEAD -- daylight-apps.py || reopen=1
+        "$ROOT/install.sh" || failed+=("dInstaller")
+        git -C "$ROOT" diff --quiet "$before" HEAD -- dinstaller.py || reopen=1
       fi
     else
-      failed+=("Daylight Apps")
+      failed+=("dInstaller")
     fi
   fi
 
@@ -60,7 +60,7 @@ exit $status'
 
   step "Done"
   [ -n "$extensions" ] && info "Log out and back in to load the updated extensions."
-  [ -n "$reopen" ] && info "Close and reopen Daylight Apps to use its new version."
+  [ -n "$reopen" ] && info "Close and reopen dInstaller to use its new version."
   if [ ${#failed[@]} -gt 0 ]; then
     fail "Could not update: $(join_names "${failed[@]}"). See above for why."
   fi

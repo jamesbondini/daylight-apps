@@ -3,5 +3,5 @@
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
 step "Disabling extension"
-gnome_ext_set_enabled split-view@jamesbondini false
+gnome_ext_set_enabled split-view@dawnos false
 info "Off. Dragging a title bar down no longer splits the screen."

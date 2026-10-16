@@ -6,6 +6,7 @@ source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 APP=com.brave.Browser
 POLICY_SRC="$(dirname "$(readlink -f "$0")")/policy.json"
 POLICY=/etc/brave/policies/managed/daylight-apps.json
+# Named before the rename to dInstaller; renaming it would ask for the password again
 
 step "Installing Brave from Flathub"
 flatpak_install_app "$APP"

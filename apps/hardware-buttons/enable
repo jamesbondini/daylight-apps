@@ -2,7 +2,7 @@
 # Turn the extension on.
 source "$(dirname "$(readlink -f "$0")")/../../lib/common.sh"
 
-UUID=hardware-buttons@jamesbondini
+UUID=hardware-buttons@dawnos
 step "Enabling extension"
 "$(dirname "$(readlink -f "$0")")/shell-keys" take
 gnome_ext_set_enabled "$UUID" true

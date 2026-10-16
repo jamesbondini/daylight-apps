@@ -1,12 +1,12 @@
 #!/bin/bash
-# One-line install of Daylight Apps:
-#   curl -fsSL https://raw.githubusercontent.com/jamesbondini/daylight-apps/main/get.sh | bash
-# Installs the dependencies, clones the repo to ~/Projects/daylight-apps (or
+# One-line install of dInstaller:
+#   curl -fsSL https://raw.githubusercontent.com/jamesbondini/dInstaller/main/get.sh | bash
+# Installs the dependencies, clones the repo to ~/Projects/dInstaller (or
 # updates an existing clone there) and adds the app to the app grid.
 set -euo pipefail
 
-REPO=https://github.com/jamesbondini/daylight-apps.git
-DEST="$HOME/Projects/daylight-apps"
+REPO=https://github.com/jamesbondini/dInstaller.git
+DEST="$HOME/Projects/dInstaller"
 DEPS=(git python3 py3-gobject3 gtk4.0 libadwaita)
 
 # Everything runs from main, so a download cut short runs nothing
@@ -25,6 +25,13 @@ main() {
     done
   fi
 
+  # Clones from before the rename from Daylight Apps
+  local old="$HOME/Projects/daylight-apps"
+  if [ -d "$old/.git" ] && [ ! -e "$DEST" ]; then
+    echo "==> Moving $old to $DEST"
+    mv "$old" "$DEST"
+  fi
+
   if [ -d "$DEST/.git" ]; then
     echo "==> Updating $DEST"
     git -C "$DEST" pull --ff-only
@@ -37,7 +44,7 @@ main() {
     git clone "$REPO" "$DEST"
   fi
 
-  echo "==> Adding Daylight Apps to the app grid"
+  echo "==> Adding dInstaller to the app grid"
   "$DEST/install.sh"
 }
 
