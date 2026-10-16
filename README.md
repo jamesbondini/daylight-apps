@@ -93,7 +93,7 @@ Installed per user from Flathub; install Flatpak (under Start Here) first.
 | LocalSend | `org.localsend.localsend_app`  | None                                        |
 | Obsidian  | `md.obsidian.Obsidian`         | Open the app and pick a vault               |
 
-Brave also gets `/etc/brave/policies/managed/daylight-apps.json`, turning off Rewards, Wallet,
+Brave also gets `/etc/brave/policies/managed/dinstaller.json`, turning off Rewards, Wallet,
 VPN, Leo, News and telemetry (Brave Origin has no musl build).
 
 ### Developer Tools
